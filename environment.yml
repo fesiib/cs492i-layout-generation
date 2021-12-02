@@ -270,4 +270,3 @@ dependencies:
     - yacs==0.1.8
     - yarl==1.6.3
     - zipp==3.6.0
-prefix: /usr/local/anaconda3/envs/cs492i

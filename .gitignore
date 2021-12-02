@@ -132,4 +132,14 @@ dmypy.json
 
 *.tar.gz
 
-./data/data_raw
+
+
+./data/mnist/
+.idea
+data/data_raw/
+src/log_0
+src/images
+
+*.gz
+*.pt
+data/mnist/MNIST/
