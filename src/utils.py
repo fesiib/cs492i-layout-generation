@@ -9,7 +9,7 @@ from functools import cmp_to_key
 
 args = edict()
 
-args.batch_size = 64
+args.batch_size = 32
 args.nlayers = 2
 
 args.embedding_size = 4
@@ -30,7 +30,7 @@ args.max_seq_length = 8
 args.latent_vector_dim = 28
 
 # GAN
-args.n_epochs = 200
+args.n_epochs = 20
 args.lr = 0.00005
 args.n_cpu = 4
 args.latent_dim = 100
@@ -58,6 +58,14 @@ BB_TYPES = [
 ]
 
 device = 'cuda:0' if torch.cuda.is_available() and args.gpu else 'cpu'
+Tensor = torch.cuda.FloatTensor if device == 'cuda:0' else torch.FloatTensor
+
+def get_Tensor():
+   return Tensor
+
+def get_z():
+    z = torch.autograd.Variable(Tensor(np.random.normal(0, 1, (args.batch_size, args.latent_vector_dim))))
+    return z
 
 def get_device():
    return device

@@ -9,8 +9,9 @@ from torch.utils.tensorboard import SummaryWriter
 from model import Discriminator, SlideDeckEncoder, Generator
 
 from preprocess import init_dataset
+from test import test
 
-from utils import SortByRefSlide, get_device, get_args
+from utils import SortByRefSlide, get_Tensor, get_device, get_args
 
 # Basic settings
 torch.manual_seed(470)
@@ -19,7 +20,7 @@ torch.cuda.manual_seed(470)
 args = get_args()
 device = get_device()
 
-Tensor = torch.cuda.FloatTensor if device == 'cuda:0' else torch.FloatTensor
+Tensor = get_Tensor()
 
 result_dir = Path(root) / 'results'
 result_dir.mkdir(parents=True, exist_ok=True)
@@ -199,6 +200,8 @@ def train():
     }
 
     run_epoch(models, optimizers, True, train_loader)
+
+    test(models, optimizers, test_loader)
     
 
 if __name__ == '__main__':
