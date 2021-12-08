@@ -111,6 +111,7 @@ class Generator(nn.Module):
         self.dropout = nn.Dropout(0.5)
         self.lstm = nn.LSTM(input_size=args.latent_vector_dim + args.embedding_size, hidden_size=args.nhid, num_layers=2, 
             batch_first=True, dropout=args.dropout, bias=True)
+        self.tanh = nn.Tanh()
         self.linear1 = nn.Linear(args.slide_deck_embedding_size, args.nhid)
         self.linear2 = nn.Linear(args.nhid, 4)
         if embed_weights is not None:
@@ -127,9 +128,7 @@ class Generator(nn.Module):
             *block(args.nhid, 32, normalize=False),
             *block(32, 32),
             nn.Linear(32, 4),
-            nn.Tanh()
         )
-
 
     def forward(self, x, z, slide_deck_embedding, lengths=None):
         """
@@ -171,7 +170,7 @@ class Generator(nn.Module):
             output = self.gen_model(output)
         else:
             output = self.linear2(output)
-
+        output = self.tanh(output)
         return output, (h_n, c_n)
 
 class Discriminator(nn.Module):

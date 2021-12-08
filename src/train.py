@@ -13,8 +13,9 @@ from torch.utils.tensorboard import SummaryWriter
 from model import Discriminator, SlideDeckEncoder, Generator
 
 from preprocess import init_dataset
+from test import test
 
-from utils import SortByRefSlide, get_device, get_args, get_img_bbs
+from utils import SortByRefSlide, get_device, get_args, get_img_bbs, get_Tensor
 
 # Basic settings
 torch.manual_seed(470)
@@ -23,59 +24,39 @@ torch.cuda.manual_seed(470)
 args = get_args()
 device = get_device()
 
-Tensor = torch.cuda.FloatTensor if device == 'cuda:0' else torch.FloatTensor
+Tensor = get_Tensor()
 
 result_dir = Path(root) / 'results'
 result_dir.mkdir(parents=True, exist_ok=True)
 
-# def save_model(model, epoch="last"):
-#     torch.save(model.state_dict(),  result_dir / f'{type(model).__name__}_{mode}.ckpt')
 
-# def load_model(model, epoch="last"):
-#     if os.path.exists(result_dir / f'{type(model).__name__}_{mode}.ckpt'):
-#         model.load_state_dict(torch.load(result_dir / f'{type(model).__name__}_{mode}.ckpt'))
-
-# def load_model(model, epoch="last"):
-#     if os.path.exists(result_dir / f'{type(model).__name__}_{mode}.ckpt'):
-#         model.load_state_dict(torch.load(result_dir / f'{type(model).__name__}_{mode}.ckpt'))
-
-# num_trial=0
-# parent_dir = result_dir / f'trial_{num_trial}'
-# while parent_dir.is_dir():
-#     num_trial = int(parent_dir.name.replace('trial_',''))
-#     parent_dir = result_dir / f'trial_{num_trial+1}'
-
-# Modify parent_dir here if you want to resume from a checkpoint, or to rename directory.
-# parent_dir = result_dir / 'trial_99'
-# print(f'Logs and ckpts will be saved in : {parent_dir}')
-
-# log_dir = parent_dir
-# ckpt_dir = parent_dir
-# encoder_ckpt_path = parent_dir / 'encoder.pt'
-# generator_ckpt_path = parent_dir / 'generator.pt'
-# discriminator_ckpt_path = parent_dir / 'discriminator.pt'
-# writer = SummaryWriter(log_dir)
-
-# def compute_gradient_penalty(D, real_samples, fake_samples):
-#     """Calculates the gradient penalty loss for WGAN GP"""
-#     # Random weight term for interpolation between real and fake samples
-#     alpha = Tensor(np.random.random((real_samples.size(0), 1, 1, 1)))
-#     # Get random interpolation between real and fake samples
-#     interpolates = (alpha * real_samples + ((1 - alpha) * fake_samples)).requires_grad_(True)
-#     d_interpolates = D(interpolates)
-#     fake = Variable(Tensor(real_samples.shape[0], 1).fill_(1.0), requires_grad=False)
-#     # Get gradient w.r.t. interpolates
-#     gradients = autograd.grad(
-#         outputs=d_interpolates,
-#         inputs=interpolates,
-#         grad_outputs=fake,
-#         create_graph=True,
-#         retain_graph=True,
-#         only_inputs=True,
-#     )[0]
-#     gradients = gradients.view(gradients.size(0), -1)
-#     gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean()
-#     return gradient_penalty
+def compute_gradient_penalty(
+    D,
+    real_samples,
+    fake_samples,
+    ref_types,
+    slide_deck_embedding,
+    length_ref
+):
+    """Calculates the gradient penalty loss for WGAN GP"""
+    # Random weight term for interpolation between real and fake samples
+    alpha = Tensor(np.random.random((real_samples.size(0), 1, 1)))
+    # Get random interpolation between real and fake samples
+    interpolates = (alpha * real_samples + ((1 - alpha) * fake_samples)).requires_grad_(True)
+    d_interpolates = D(ref_types, interpolates, slide_deck_embedding, length_ref)
+    fake = torch.autograd.Variable(Tensor(real_samples.shape[0], 1).fill_(1.0), requires_grad=False)
+    # Get gradient w.r.t. interpolates
+    gradients = torch.autograd.grad(
+        outputs=d_interpolates,
+        inputs=interpolates,
+        grad_outputs=fake,
+        create_graph=True,
+        retain_graph=True,
+        only_inputs=True,
+    )[0]
+    gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2)
+    gradient_penalty = torch.mean(gradient_penalty)
+    return gradient_penalty
 
 def save_checkpoint(models, optimizers, ckpt_dir, epoch):
     
@@ -94,7 +75,6 @@ def save_checkpoint(models, optimizers, ckpt_dir, epoch):
 def load_chekpoint(path, models, optimizers):
     # path = str(os.path.join(ckpt_dir, f"checkpoint_{epoch}.pt"))
     checkpoint = torch.load(path)
-    
 
     models['encoder'].load_state_dict(checkpoint['model_encoder_state_dict'])
     models['discriminator'].load_state_dict(checkpoint['model_discriminator_state_dict'])
@@ -109,29 +89,16 @@ def load_chekpoint(path, models, optimizers):
 
 
 def run_epochs(models, optimizers, train_dataloader, test_dataloader, writer = None, *args, **kwargs):
-    
-
 
     for epoch in range(args.n_epochs):
-
-        D_loss, G_loss = run_epoch(epoch, models, optimizers, is_train=True, dataloader=train_dataloader, writer = writer)
-
-
-        
-        
+        D_loss, G_loss = run_epoch(epoch, models, optimizers, is_train=True, dataloader=train_dataloader, writer = writer,
+            clipping = False, L1_loss=False)
         if epoch % args.save_period:
-
             save_checkpoint(models, optimizers, kwargs['checkpoint_dir'], epoch)
-            
-            
-
-
-        # run_epoch(epoch, models, optimizers, is_train=False, dataloader=test_dataloader, writer = writer)
 
 def get_l1_loss(fake_layouts, real_layouts):
     
     return F.l1_loss(fake_layouts, real_layouts)
-    
 
 
 def run_epoch(epoch, models, optimizers, is_train=True, 
@@ -194,15 +161,21 @@ def run_epoch(epoch, models, optimizers, is_train=True,
 
         fake_layouts_bbs = models['generator'](ref_types, z, slide_deck_embedding, length_ref)[0].detach()
 
-
-
-        # print("true: ", models["discriminator"](ref_types, real_layouts_bbs, slide_deck_embedding, length_ref))
-        # print("false: ", models["discriminator"](ref_types, fake_layouts_bbs, slide_deck_embedding, length_ref))
+        gradient_penalty = compute_gradient_penalty(
+            models['discriminator'],
+            real_layouts_bbs,
+            fake_layouts_bbs,
+            ref_types,
+            slide_deck_embedding,
+            length_ref
+        )
 
 
         loss_D_real = -torch.mean(models["discriminator"](ref_types, real_layouts_bbs, slide_deck_embedding, length_ref))
         loss_D_fake = torch.mean(models["discriminator"](ref_types, fake_layouts_bbs, slide_deck_embedding, length_ref))
-        loss_D = loss_D_real + loss_D_fake
+        loss_D_grad_penalty = args.lambda_gp * gradient_penalty
+        
+        loss_D = loss_D_real + loss_D_fake + loss_D_grad_penalty
         
         if L1_loss:
             loss_D += args.lamda_l1 * get_l1_loss(fake_layouts_bbs, real_layouts_bbs)
@@ -292,8 +265,25 @@ def train():
         "generator": torch.optim.RMSprop(models["generator"].parameters(), lr=args.lr),
         "encoder" : torch.optim.RMSprop(models["encoder"].parameters(), lr=args.lr)
     }
+    
+    num_trial=0
+    parent_dir = result_dir / f'trial_{num_trial}'
+    while parent_dir.is_dir():
+        num_trial = int(parent_dir.name.replace('trial_',''))
+        parent_dir = result_dir / f'trial_{num_trial+1}'
 
-    run_epoch(models, optimizers, True, train_loader)
+    # Modify parent_dir here if you want to resume from a checkpoint, or to rename directory.
+    # parent_dir = result_dir / 'trial_99'
+    print(f'Logs and ckpts will be saved in : {parent_dir}')
+
+    log_dir = parent_dir
+    ckpt_dir = parent_dir
+    writer = SummaryWriter(log_dir)
+
+
+    run_epochs(models, optimizers, train_loader, test_loader, writer = writer, checkpoint_dir=ckpt_dir)
+
+    test(models, optimizers, test_loader)
     
 
 if __name__ == '__main__':
