@@ -61,8 +61,18 @@ def compute_gradient_penalty(
     return gradient_penalty
 
 def save_checkpoint(models, optimizers, ckpt_dir, epoch):
-    
     path = str(os.path.join(ckpt_dir, f"checkpoint_{epoch}.pt"))
+    torch.save(
+    { 
+        'epoch' : epoch,
+        'model_encoder_state_dict': models['encoder'].state_dict(),
+        'model_generator_state_dict': models['generator'].state_dict(),
+        'model_discriminator_state_dict': models['discriminator'].state_dict(),
+        'optimizer_encoder_state_dict': optimizers['encoder'].state_dict(),
+        'optimizer_generator_state_dict': optimizers['generator'].state_dict(),
+        'optimizer_discriminator_state_dict': optimizers['discriminator'].state_dict()
+    }, path)
+    path = str(os.path.join(ckpt_dir, f"checkpoint_last.pt"))
     torch.save(
     { 
         'epoch' : epoch,
@@ -75,8 +85,13 @@ def save_checkpoint(models, optimizers, ckpt_dir, epoch):
     }, path)
 
 def load_chekpoint(path, models, optimizers):
-    # path = str(os.path.join(ckpt_dir, f"checkpoint_{epoch}.pt"))
-    checkpoint = torch.load(path)
+    path = os.path.join(path, 'checkpoint_last.pt')
+    print(path)
+    try:
+       checkpoint = torch.load(path)
+    except:
+        print("Couldn't load the last checkpoint!")
+        return models, optimizers, -1
 
     models['encoder'].load_state_dict(checkpoint['model_encoder_state_dict'])
     models['discriminator'].load_state_dict(checkpoint['model_discriminator_state_dict'])
@@ -90,11 +105,23 @@ def load_chekpoint(path, models, optimizers):
     return models, optimizers, epoch
 
 
-def run_epochs(models, optimizers, train_dataloader, test_dataloader, checkpoint_dir, writer = None):
-    for epoch in range(args.n_epochs):
-        D_loss, G_loss = run_epoch(epoch, models, optimizers, is_train=True, dataloader=train_dataloader, writer = writer,
-            clipping = False, L1_loss=False)
-        if epoch % args.save_period:
+def run_epochs(models, optimizers, train_dataloader, test_dataloader, checkpoint_dir, writer = None, load_last = False):
+    loaded_epoch = -1
+    if load_last:
+        (models, optimizers, loaded_epoch) = load_chekpoint(checkpoint_dir, models, optimizers)
+    
+    for epoch in range(loaded_epoch + 1, args.n_epochs):
+        D_loss, G_loss = run_epoch(
+            epoch,
+            models,
+            optimizers,
+            is_train=True,
+            dataloader=train_dataloader,
+            writer = writer,
+            clipping = False,
+            L1_loss=args.enable_L1_loss
+        )
+        if (epoch+1) % args.save_period == 0:
             save_checkpoint(models, optimizers, checkpoint_dir, epoch)
 
 def get_l1_loss(fake_layouts, real_layouts):
@@ -176,7 +203,7 @@ def run_epoch(epoch, models, optimizers, is_train=True,
         loss_D_fake = torch.mean(models["discriminator"](ref_types, fake_layouts_bbs, slide_deck_embedding, length_ref))
         loss_D_grad_penalty = args.lambda_gp * gradient_penalty
         
-        loss_D = loss_D_real + loss_D_fake + loss_D_grad_penalty
+        loss_D = loss_D_real + loss_D_fake
         
         if L1_loss:
             loss_D += args.lamda_l1 * get_l1_loss(fake_layouts_bbs, real_layouts_bbs)
@@ -272,17 +299,16 @@ def train():
         parent_dir = result_dir / f'trial_{num_trial+1}'
 
     # Modify parent_dir here if you want to resume from a checkpoint, or to rename directory.
-    # parent_dir = result_dir / 'trial_99'
+    parent_dir = result_dir / 'trial_2'
     print(f'Logs and ckpts will be saved in : {parent_dir}')
 
     log_dir = parent_dir
     ckpt_dir = parent_dir
     writer = SummaryWriter(log_dir)
 
+    run_epochs(models, optimizers, train_loader, test_loader, checkpoint_dir=ckpt_dir, writer = writer, load_last = True)
 
-    run_epochs(models, optimizers, train_loader, test_loader, checkpoint_dir=ckpt_dir, writer = writer)
-
-    test(models, optimizers, test_loader)
+    #test(models, optimizers, test_loader)
     
 
 if __name__ == '__main__':
