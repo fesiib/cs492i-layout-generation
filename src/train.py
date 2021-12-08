@@ -134,6 +134,9 @@ def run_epoch(
         
     total_loss_G = 0
     total_loss_D = 0
+    total_l1_D = 0
+    total_gp_D = 0
+
     G_num = 0
     D_num = 0
     loss_G = 0
@@ -204,14 +207,16 @@ def run_epoch(
 
         loss_D_real = -torch.mean(models["discriminator"](ref_types, real_layouts_bbs, slide_deck_embedding, length_ref))
         loss_D_fake = torch.mean(models["discriminator"](ref_types, fake_layouts_bbs, slide_deck_embedding, length_ref))
-        loss_D_grad_penalty = args.lambda_gp * gradient_penalty
-        
         loss_D = loss_D_real + loss_D_fake
         
         if L1_loss:
-            loss_D += args.lamda_l1 * get_l1_loss(fake_layouts_bbs, real_layouts_bbs)
+            loss_D_l1 = args.lamda_l1 * get_l1_loss(fake_layouts_bbs, real_layouts_bbs)
+            loss_D += loss_D_l1
+            total_l1_D += loss_D_l1
         if gp:
+            loss_D_grad_penalty = args.lambda_gp * gradient_penalty
             loss_D += loss_D_grad_penalty
+            total_gp_D += loss_D_grad_penalty
 
         total_loss_D_fake += loss_D_fake.item()
         total_loss_D_real += loss_D_real.item()
@@ -244,6 +249,10 @@ def run_epoch(
             optimizers["encoder"].step()
     
     if writer is not None:
+        if L1_loss:
+            writer.add_scalar('Loss/L1-loss', total_l1_D / D_num, epoch)
+        if gp:
+            writer.add_scalar('Loss/GP-loss', total_gp_D / D_num, epoch)
         writer.add_scalar('Loss/Discriminator', total_loss_D/D_num, epoch)
         writer.add_scalar('Loss/Generator', total_loss_G/G_num, epoch)
         writer.add_scalar('Loss/Discriminator Real', total_loss_D_real/D_num, epoch)
@@ -305,7 +314,7 @@ def train():
         parent_dir = result_dir / f'trial_{num_trial+1}'
 
     # Modify parent_dir here if you want to resume from a checkpoint, or to rename directory.
-    parent_dir = result_dir / 'trial_4'
+    parent_dir = result_dir / 'trial_5'
     print(f'Logs and ckpts will be saved in : {parent_dir}')
 
     log_dir = parent_dir
