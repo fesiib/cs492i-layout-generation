@@ -12,16 +12,16 @@ args = edict()
 args.batch_size = 32
 args.nlayers = 2
 
-args.embedding_size = 4
+args.embedding_size = 2
 args.ninp = 4 + args.embedding_size
-args.nhid = 64 #512
+args.nhid = 256 #512
 
-args.dropout = 0.2
+args.dropout = 0.5
 args.gpu = True
 
 args.tensorboard = False
 args.train_portion = 0.7
-args.slide_deck_N = 5
+args.slide_deck_N = 4
 args.slide_deck_embedding_size = 512
 args.padding_idx = 0
 args.max_seq_length = 8
@@ -37,7 +37,7 @@ args.latent_dim = 100
 args.channels = 1
 args.clip_value = 0.1
 args.sample_interval = 400
-args.n_critic = 2
+args.n_critic = 5
 args.b1 = 0.5
 args.b2 = 0.999
 
@@ -98,7 +98,7 @@ def draw_bbs(shape, bbs):
     
     h, w = shape
     fig, ax = plt.subplots(1)
-    background=patches.Rectangle((0, 0), w, h, linewidth=2, edgecolor='b', facecolor='black')
+    background=patches.Rectangle((-w, -h), w + w, h + h, linewidth=2, edgecolor='b', facecolor='black')
     ax.add_patch(background)
     for bb in bbs:
         rect = patches.Rectangle((bb[0], bb[1]), bb[2], bb[3], linewidth=1, edgecolor='r', facecolor='none')

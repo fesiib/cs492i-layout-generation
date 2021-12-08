@@ -194,6 +194,10 @@ class ShuffleRefSlide(object):
 class ToTensorBB(object):
     """Convert ndarrays in sample to Tensors."""
 
+    def normalize(self, w, h, slide, length):
+        slide[:length] = (slide[:length] - torch.tensor([w/2, h/2, 0, 0, 0])) * torch.tensor([2/w, 2/h, 2/w, 2/h, 1])
+        return slide
+
     def __call__(self, sample):
         h, w = sample["shape"]
         ref_slide = sample["ref_slide"]
@@ -220,6 +224,11 @@ class ToTensorBB(object):
 
         length_ref_types = torch.tensor(length_ref_types, dtype=torch.int32)
 
+
+        ## Normalize:
+        ref_slide = self.normalize(w, h, ref_slide, length_ref_types)
+        for (i, length) in enumerate(lengths_slide_deck):
+            slide_deck[i] = self.normalize(w, h, slide_deck[i], length)
         return {
             "shape": shape,
             "ref_slide": ref_slide,
