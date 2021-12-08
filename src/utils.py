@@ -6,6 +6,7 @@ import matplotlib.patches as patches
 
 from easydict import EasyDict as edict
 from functools import cmp_to_key
+from matplotlib.backends.backend_agg import FigureCanvasAgg
 
 args = edict()
 
@@ -40,6 +41,8 @@ args.sample_interval = 400
 args.n_critic = 2
 args.b1 = 0.5
 args.b2 = 0.999
+args.save_period = 20
+args.lamda_l1 = 0.3
 
 BB_TYPES = [
     '<pad>',
@@ -98,6 +101,29 @@ def draw_bbs(shape, bbs):
     ax.autoscale(True, 'both')
     plt.show()
     return
+
+def get_img_bbs(shape, bbs):
+    if (torch.is_tensor(bbs)):
+        bbs = np.array(bbs.tolist())
+    if (torch.is_tensor(shape)):
+        [h, w] = np.array(shape.tolist())
+        shape = (h, w)
+    
+    h, w = shape
+    fig, ax = plt.subplots(1)
+    background=patches.Rectangle((0, 0), w, h, linewidth=2, edgecolor='b', facecolor='black')
+    ax.add_patch(background)
+    for bb in bbs:
+        rect = patches.Rectangle((bb[0], bb[1]), bb[2], bb[3], linewidth=1, edgecolor='r', facecolor='none')
+        ax.add_patch(rect)
+    ax.autoscale(True, 'both')
+    canvas = FigureCanvasAgg(fig)
+    plt.close(fig)
+    
+    canvas.draw()
+    rgba = np.asarray(canvas.buffer_rgba())
+    return rgba[:,:,:3]
+
 
 def get_BB_types(bbs):
     return bbs[:, 4]
