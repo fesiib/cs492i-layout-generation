@@ -11,7 +11,7 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg
 args = edict()
 
 args.batch_size = 32
-args.n_epochs = 60
+args.n_epochs = 1000
 
 args.lr = 0.00005
 
@@ -23,7 +23,7 @@ args.gpu = True
 args.slide_deck_N = 4
 args.max_seq_length = 8
 
-args.save_period = 5
+args.save_period = 30
 args.lamda_l1 = 100
 args.lambda_gp = 1
 

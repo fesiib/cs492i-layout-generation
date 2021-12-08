@@ -149,7 +149,8 @@ def run_epoch(
             models[model].eval()
 
     real_layouts_bbs = None
-    real_layouts_bbs = None
+    fake_layouts_bbs = None
+    ref_length = None
 
     for i, batch in enumerate(dataloader):
         batch = SortByRefSlide(batch)
@@ -188,6 +189,8 @@ def run_epoch(
         real_layouts_bbs = ref_slide[:,:,:-1]
 
         fake_layouts_bbs = models['generator'](ref_types, z, slide_deck_embedding, length_ref)[0].detach()
+
+        ref_length = length_ref
 
         gradient_penalty = compute_gradient_penalty(
             models['discriminator'],
@@ -240,7 +243,6 @@ def run_epoch(
             optimizers["generator"].step()
             optimizers["encoder"].step()
     
-    
     if writer is not None:
         writer.add_scalar('Loss/Discriminator', total_loss_D/D_num, epoch)
         writer.add_scalar('Loss/Generator', total_loss_G/G_num, epoch)
@@ -250,7 +252,7 @@ def run_epoch(
             batch_size, _, _ = real_layouts_bbs.shape
             reals = []
             for i in range(batch_size//4):
-                img = get_img_bbs((1, 1), real_layouts_bbs[i,:,:])
+                img = get_img_bbs((1, 1), real_layouts_bbs[i,:ref_length[i],:])
                 img = cv2.resize(img, (args.image_H, args.image_W))
                 img = np.transpose(img, (2, 0, 1))
                 reals.append(img)
@@ -259,7 +261,7 @@ def run_epoch(
             
             fakes = []
             for i in range(batch_size//4):
-                img = get_img_bbs((1, 1), fake_layouts_bbs[i,:,:])
+                img = get_img_bbs((1, 1), fake_layouts_bbs[i,:ref_length[i],:])
                 img = cv2.resize(img, (args.image_H, args.image_W))
                 img = np.transpose(img, (2, 0, 1))
                 fakes.append(img)
@@ -303,7 +305,7 @@ def train():
         parent_dir = result_dir / f'trial_{num_trial+1}'
 
     # Modify parent_dir here if you want to resume from a checkpoint, or to rename directory.
-    #parent_dir = result_dir / 'trial_2'
+    parent_dir = result_dir / 'trial_4'
     print(f'Logs and ckpts will be saved in : {parent_dir}')
 
     log_dir = parent_dir
