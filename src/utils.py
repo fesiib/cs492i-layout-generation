@@ -17,6 +17,9 @@ args.embedding_size = 2
 args.ninp = 4 + args.embedding_size
 args.nhid = 256 #512
 
+args.image_H = 100
+args.image_W = 100
+
 args.dropout = 0.5
 args.gpu = True
 

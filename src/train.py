@@ -1,7 +1,9 @@
 root = './'
-import numpy as np
-from pathlib import Path
 import os
+from pathlib import Path
+
+import cv2
+import numpy as np
 
 import torch
 import torch.nn as nn
@@ -10,8 +12,8 @@ from torch.nn.modules import loss
 
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
-from model import Discriminator, SlideDeckEncoder, Generator
 
+from model import Discriminator, SlideDeckEncoder, Generator
 from preprocess import init_dataset
 from test import test
 
@@ -88,13 +90,12 @@ def load_chekpoint(path, models, optimizers):
     return models, optimizers, epoch
 
 
-def run_epochs(models, optimizers, train_dataloader, test_dataloader, writer = None, *args, **kwargs):
-
+def run_epochs(models, optimizers, train_dataloader, test_dataloader, checkpoint_dir, writer = None):
     for epoch in range(args.n_epochs):
         D_loss, G_loss = run_epoch(epoch, models, optimizers, is_train=True, dataloader=train_dataloader, writer = writer,
             clipping = False, L1_loss=False)
         if epoch % args.save_period:
-            save_checkpoint(models, optimizers, kwargs['checkpoint_dir'], epoch)
+            save_checkpoint(models, optimizers, checkpoint_dir, epoch)
 
 def get_l1_loss(fake_layouts, real_layouts):
     
@@ -220,22 +221,20 @@ def run_epoch(epoch, models, optimizers, is_train=True,
             reals = []
             for i in range(batch_size//4):
                 img = get_img_bbs((1, 1), real_layouts_bbs[i,:,:])
-                img = img.transpose(0, 2)
-                img = img.transpose(0, 1)
+                img = cv2.resize(img, (args.image_H, args.image_W))
+                img = np.transpose(img, (2, 0, 1))
                 reals.append(img)
-            reals = np.concatenate(reals)
+            reals = np.concatenate(np.expand_dims(reals, axis=0))
             writer.add_images('real layouts', reals, epoch)
             
             fakes = []
             for i in range(batch_size//4):
                 img = get_img_bbs((1, 1), fake_layouts_bbs[i,:,:])
-                img = img.transpose(0, 2)
-                img = img.transpose(1, 2)
-                reals.append(img)
-            fakes = np.concatenate(fakes)
+                img = cv2.resize(img, (args.image_H, args.image_W))
+                img = np.transpose(img, (2, 0, 1))
+                fakes.append(img)
+            fakes = np.concatenate(np.expand_dims(fakes, axis=0))
             writer.add_images('fake layouts', fakes, epoch)
-
-
     print(
         "[Epoch %d/%d] [D loss: %.4f D real loss: %.4f D fake loss: %.4f| Steps: %d] [G loss: %.4f Steps: %d]"
         % (epoch, args.n_epochs, total_loss_D/D_num, total_loss_D_real/D_num, total_loss_D_fake/D_num, 
@@ -281,7 +280,7 @@ def train():
     writer = SummaryWriter(log_dir)
 
 
-    run_epochs(models, optimizers, train_loader, test_loader, writer = writer, checkpoint_dir=ckpt_dir)
+    run_epochs(models, optimizers, train_loader, test_loader, checkpoint_dir=ckpt_dir, writer = writer)
 
     test(models, optimizers, test_loader)
     
