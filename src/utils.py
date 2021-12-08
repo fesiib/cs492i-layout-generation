@@ -40,6 +40,7 @@ args.sample_interval = 400
 args.n_critic = 5
 args.b1 = 0.5
 args.b2 = 0.999
+args.lambda_gp = 10
 
 BB_TYPES = [
     '<pad>',

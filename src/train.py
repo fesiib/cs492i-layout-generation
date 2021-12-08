@@ -53,28 +53,38 @@ result_dir.mkdir(parents=True, exist_ok=True)
 # discriminator_ckpt_path = parent_dir / 'discriminator.pt'
 # writer = SummaryWriter(log_dir)
 
-# def compute_gradient_penalty(D, real_samples, fake_samples):
-#     """Calculates the gradient penalty loss for WGAN GP"""
-#     # Random weight term for interpolation between real and fake samples
-#     alpha = Tensor(np.random.random((real_samples.size(0), 1, 1, 1)))
-#     # Get random interpolation between real and fake samples
-#     interpolates = (alpha * real_samples + ((1 - alpha) * fake_samples)).requires_grad_(True)
-#     d_interpolates = D(interpolates)
-#     fake = Variable(Tensor(real_samples.shape[0], 1).fill_(1.0), requires_grad=False)
-#     # Get gradient w.r.t. interpolates
-#     gradients = autograd.grad(
-#         outputs=d_interpolates,
-#         inputs=interpolates,
-#         grad_outputs=fake,
-#         create_graph=True,
-#         retain_graph=True,
-#         only_inputs=True,
-#     )[0]
-#     gradients = gradients.view(gradients.size(0), -1)
-#     gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean()
-#     return gradient_penalty
+def compute_gradient_penalty(
+    D,
+    real_samples,
+    fake_samples,
+    ref_types,
+    slide_deck_embedding,
+    length_ref
+):
+    """Calculates the gradient penalty loss for WGAN GP"""
+    # Random weight term for interpolation between real and fake samples
+    alpha = Tensor(np.random.random((real_samples.size(0), 1, 1)))
+    # Get random interpolation between real and fake samples
+    interpolates = (alpha * real_samples + ((1 - alpha) * fake_samples)).requires_grad_(True)
+    d_interpolates = D(ref_types, interpolates, slide_deck_embedding, length_ref)
+    fake = torch.autograd.Variable(Tensor(real_samples.shape[0], 1).fill_(1.0), requires_grad=False)
+    # Get gradient w.r.t. interpolates
+    gradients = torch.autograd.grad(
+        outputs=d_interpolates,
+        inputs=interpolates,
+        grad_outputs=fake,
+        create_graph=True,
+        retain_graph=True,
+        only_inputs=True,
+    )[0]
+    gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2)
+    gradient_penalty = torch.mean(gradient_penalty)
+    return gradient_penalty
 
 def run_epoch(models, optimizers, is_train=True, dataloader=None):
+    def grad_penalty_D():
+        return 
+    
     batches_done = 0
     for epoch in range(args.n_epochs):
         total_loss_G = 0
@@ -128,6 +138,15 @@ def run_epoch(models, optimizers, is_train=True, dataloader=None):
 
             fake_layouts_bbs = models['generator'](ref_types, z, slide_deck_embedding, length_ref)[0].detach()
 
+            gradient_penalty = compute_gradient_penalty(
+                models['discriminator'],
+                real_layouts_bbs,
+                fake_layouts_bbs,
+                ref_types,
+                slide_deck_embedding,
+                length_ref
+            )
+
     #        print("true", real_layouts_bbs[:,:,:4])
    #         print("fake", fake_layouts_bbs[:,:,:4])
 
@@ -138,7 +157,9 @@ def run_epoch(models, optimizers, is_train=True, dataloader=None):
 #            break
 
             loss_D = (-torch.mean(models["discriminator"](ref_types, real_layouts_bbs, slide_deck_embedding, length_ref))
-                + torch.mean(models["discriminator"](ref_types, fake_layouts_bbs, slide_deck_embedding, length_ref)))
+                + torch.mean(models["discriminator"](ref_types, fake_layouts_bbs, slide_deck_embedding, length_ref))
+                + args.lambda_gp * gradient_penalty
+            )
             #     x (tensor): type labels, (Batch_size, Sequence_size)
             #     bb (tensor): (Batch_size, Sequence_size, 4)
             #     slide_deck_embedding (tensor): slide_deck_embedding vector, (Batch_size, slide_deck_embedding_dim)
