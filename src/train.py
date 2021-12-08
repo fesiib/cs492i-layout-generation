@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 
 import cv2
+import json
 import numpy as np
 
 import torch
@@ -61,28 +62,23 @@ def compute_gradient_penalty(
     return gradient_penalty
 
 def save_checkpoint(models, optimizers, ckpt_dir, epoch):
-    path = str(os.path.join(ckpt_dir, f"checkpoint_{epoch}.pt"))
-    torch.save(
-    { 
-        'epoch' : epoch,
-        'model_encoder_state_dict': models['encoder'].state_dict(),
-        'model_generator_state_dict': models['generator'].state_dict(),
-        'model_discriminator_state_dict': models['discriminator'].state_dict(),
-        'optimizer_encoder_state_dict': optimizers['encoder'].state_dict(),
-        'optimizer_generator_state_dict': optimizers['generator'].state_dict(),
-        'optimizer_discriminator_state_dict': optimizers['discriminator'].state_dict()
-    }, path)
-    path = str(os.path.join(ckpt_dir, f"checkpoint_last.pt"))
-    torch.save(
-    { 
-        'epoch' : epoch,
-        'model_encoder_state_dict': models['encoder'].state_dict(),
-        'model_generator_state_dict': models['generator'].state_dict(),
-        'model_discriminator_state_dict': models['discriminator'].state_dict(),
-        'optimizer_encoder_state_dict': optimizers['encoder'].state_dict(),
-        'optimizer_generator_state_dict': optimizers['generator'].state_dict(),
-        'optimizer_discriminator_state_dict': optimizers['discriminator'].state_dict()
-    }, path)
+    def inner_save(path, chkp, params):
+        torch.save(
+        { 
+            'epoch' : epoch,
+            'model_encoder_state_dict': models['encoder'].state_dict(),
+            'model_generator_state_dict': models['generator'].state_dict(),
+            'model_discriminator_state_dict': models['discriminator'].state_dict(),
+            'optimizer_encoder_state_dict': optimizers['encoder'].state_dict(),
+            'optimizer_generator_state_dict': optimizers['generator'].state_dict(),
+            'optimizer_discriminator_state_dict': optimizers['discriminator'].state_dict()
+        }, os.path.join(path, chkp))
+        params_path = os.path.join(path, params)
+        with open(params_path, 'w') as f:
+            f.write(json.dumps(args, separators=(',\n', ':')))
+    
+    inner_save(ckpt_dir, f"checkpoint_{epoch}.pt", f"args_{epoch}.json")
+    inner_save(ckpt_dir, f"checkpoint_last.pt", f"args_last.json")
 
 def load_chekpoint(path, models, optimizers):
     path = os.path.join(path, 'checkpoint_last.pt')
@@ -111,26 +107,30 @@ def run_epochs(models, optimizers, train_dataloader, test_dataloader, checkpoint
         (models, optimizers, loaded_epoch) = load_chekpoint(checkpoint_dir, models, optimizers)
     
     for epoch in range(loaded_epoch + 1, args.n_epochs):
-        D_loss, G_loss = run_epoch(
-            epoch,
-            models,
-            optimizers,
-            is_train=True,
-            dataloader=train_dataloader,
-            writer = writer,
-            clipping = False,
-            L1_loss=args.enable_L1_loss
-        )
-        if (epoch+1) % args.save_period == 0:
-            save_checkpoint(models, optimizers, checkpoint_dir, epoch)
+        with torch.backends.cudnn.flags(enabled=False):
+            D_loss, G_loss = run_epoch(
+                epoch,
+                models,
+                optimizers,
+                is_train=True,
+                dataloader=train_dataloader,
+                writer = writer,
+                clipping = args.enable_clipping,
+                L1_loss=args.enable_L1_loss,
+                gp = args.enable_gp,
+            )
+            if (epoch+1) % args.save_period == 0:
+                save_checkpoint(models, optimizers, checkpoint_dir, epoch)
 
 def get_l1_loss(fake_layouts, real_layouts):
     
     return F.l1_loss(fake_layouts, real_layouts)
 
 
-def run_epoch(epoch, models, optimizers, is_train=True, 
-    dataloader=None, writer = None, clipping = False, L1_loss=True):
+def run_epoch(
+    epoch, models, optimizers,
+    is_train=True, dataloader=None, writer = None,
+    clipping = False, L1_loss=False, gp=False):
         
     total_loss_G = 0
     total_loss_D = 0
@@ -207,12 +207,15 @@ def run_epoch(epoch, models, optimizers, is_train=True,
         
         if L1_loss:
             loss_D += args.lamda_l1 * get_l1_loss(fake_layouts_bbs, real_layouts_bbs)
+        if gp:
+            loss_D += loss_D_grad_penalty
 
         total_loss_D_fake += loss_D_fake.item()
         total_loss_D_real += loss_D_real.item()
         total_loss_D += loss_D.item()
         D_num += 1
-        loss_D.backward()
+        with torch.backends.cudnn.flags(enabled=False):
+            loss_D.backward()
         optimizers["discriminator"].step()
         optimizers["encoder"].step()
 
@@ -271,6 +274,7 @@ def run_epoch(epoch, models, optimizers, is_train=True,
     return total_loss_D/D_num, total_loss_G/G_num
 
 def train():
+    print(device)
     (train_dataset, test_dataset) = init_dataset()
 
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, drop_last=True)
@@ -299,7 +303,7 @@ def train():
         parent_dir = result_dir / f'trial_{num_trial+1}'
 
     # Modify parent_dir here if you want to resume from a checkpoint, or to rename directory.
-    parent_dir = result_dir / 'trial_2'
+    #parent_dir = result_dir / 'trial_2'
     print(f'Logs and ckpts will be saved in : {parent_dir}')
 
     log_dir = parent_dir

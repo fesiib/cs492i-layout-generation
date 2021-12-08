@@ -16,6 +16,8 @@ args.n_epochs = 60
 args.lr = 0.00005
 
 args.enable_L1_loss = True
+args.enable_gp = True
+args.enable_clipping = False
 args.gpu = True
 
 args.slide_deck_N = 4
@@ -23,7 +25,7 @@ args.max_seq_length = 8
 
 args.save_period = 5
 args.lamda_l1 = 100
-args.lambda_gp = 10
+args.lambda_gp = 1
 
 args.nlayers = 2
 
