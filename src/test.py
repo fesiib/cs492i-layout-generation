@@ -7,7 +7,7 @@ device = get_device()
 def test(models, optimizers, loader):
     for model in models:
         models[model].eval()
-    print(list(loader))
+
     batch = list(loader)[0]
     batch = SortByRefSlide(batch)
     x_slide_deck = batch["slide_deck"].to(device)
