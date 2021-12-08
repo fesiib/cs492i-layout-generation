@@ -145,3 +145,5 @@ src/images
 *.gz
 *.pt
 data/mnist/MNIST/
+
+.vscode
