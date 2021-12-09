@@ -107,7 +107,7 @@ def run_epochs(models, optimizers, train_dataloader, test_dataloader, checkpoint
         (models, optimizers, loaded_epoch) = load_chekpoint(checkpoint_dir, models, optimizers)
     
     for epoch in range(loaded_epoch + 1, args.n_epochs):
-        with torch.backends.cudnn.flags(enabled=False):
+        with torch.backends.cudnn.flags(enabled=(not args.enable_gp)):
             D_loss, G_loss = run_epoch(
                 epoch,
                 models,
@@ -314,7 +314,7 @@ def train():
         parent_dir = result_dir / f'trial_{num_trial+1}'
 
     # Modify parent_dir here if you want to resume from a checkpoint, or to rename directory.
-    parent_dir = result_dir / 'trial_5'
+    parent_dir = result_dir / 'trial_7'
     print(f'Logs and ckpts will be saved in : {parent_dir}')
 
     log_dir = parent_dir

@@ -10,7 +10,7 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg
 
 args = edict()
 
-args.batch_size = 32
+args.batch_size = 64
 args.n_epochs = 1000
 
 args.lr = 0.00005
@@ -25,13 +25,13 @@ args.max_seq_length = 8
 
 args.save_period = 30
 args.lamda_l1 = 100
-args.lambda_gp = 1
+args.lambda_gp = 10
 
 args.nlayers = 2
 
 args.embedding_size = 2
 args.ninp = 4 + args.embedding_size
-args.nhid = 256 #512
+args.nhid = 512 #512
 
 args.image_H = 400
 args.image_W = 400
@@ -39,7 +39,7 @@ args.image_W = 400
 args.dropout = 0.5
 
 args.train_portion = 0.7
-args.slide_deck_embedding_size = 512
+args.slide_deck_embedding_size = 1024
 args.padding_idx = 0
 
 # Decoder
