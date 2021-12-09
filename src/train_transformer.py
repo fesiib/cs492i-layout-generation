@@ -193,9 +193,7 @@ def run_epoch(
         
         padding_mask = ~(ref_length[:, None] > torch.arange(label.size(1)).to(device)[None, :])
         bbox_real = ref_slide[:, :, :-1]
-        z = torch.randn(label.size(0), label.size(1),
-                        args.latent_size, device=device)
-
+        z = torch.autograd.Variable(Tensor(np.random.normal(0, 1, (label.size(0), label.size(1), args.latent_size))))
         packed_label = to_one_hot(label[~padding_mask], args.num_label)
         packed_bbox_real = bbox_real[~padding_mask]
 

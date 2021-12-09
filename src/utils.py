@@ -28,7 +28,7 @@ args = edict()
 
 # General
 args.batch_size = 64
-args.n_epochs = 1000
+args.n_epochs = 10000
 
 args.lr = 0.00005
 
