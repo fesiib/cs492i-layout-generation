@@ -10,49 +10,57 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg
 
 args = edict()
 
+# General
 args.batch_size = 64
 args.n_epochs = 1000
 
 args.lr = 0.00005
+
+args.save_period = 30
+args.lamda_l1 = 100
+args.lambda_gp = 10
 
 args.enable_L1_loss = True
 args.enable_gp = True
 args.enable_clipping = False
 args.gpu = True
 
-args.slide_deck_N = 4
-args.max_seq_length = 8
-
-args.save_period = 30
-args.lamda_l1 = 100
-args.lambda_gp = 10
-
-args.nlayers = 2
-
-args.embedding_size = 2
-args.ninp = 4 + args.embedding_size
-args.nhid = 512 #512
-
-args.image_H = 400
-args.image_W = 400
-
-args.dropout = 0.5
-
-args.train_portion = 0.7
-args.slide_deck_embedding_size = 1024
-args.padding_idx = 0
-
-# Decoder
-args.latent_vector_dim = 28
-
-# GAN
+#GAN
 args.n_cpu = 4
-args.latent_dim = 100
+args.latent_vector_dim = 100
 args.channels = 1
 args.clip_value = 0.1
 args.n_critic = 5
 args.b1 = 0.5
 args.b2 = 0.999
+
+# Data
+args.slide_deck_N = 4
+args.max_seq_length = 8
+
+args.image_H = 400
+args.image_W = 400
+
+args.train_portion = 0.7
+
+# Encoder
+args.slide_deck_embedding_size = 1024
+
+# Generator
+
+# Discriminator
+
+args.nlayers = 2
+
+args.embedding_size = 2
+
+args.ninp = 4 + args.embedding_size
+
+args.nhid = 512 #512
+
+args.dropout = 0.5
+
+args.padding_idx = 0
 
 BB_TYPES = [
     '<pad>',
