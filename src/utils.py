@@ -8,60 +8,6 @@ from easydict import EasyDict as edict
 from functools import cmp_to_key
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 
-args = edict()
-
-# General
-args.batch_size = 64
-args.n_epochs = 1000
-
-args.lr = 0.00005
-
-args.save_period = 30
-args.lamda_l1 = 100
-args.lambda_gp = 10
-
-args.enable_L1_loss = True
-args.enable_gp = True
-args.enable_clipping = False
-args.gpu = True
-
-#GAN
-args.n_cpu = 4
-args.latent_vector_dim = 100
-args.channels = 1
-args.clip_value = 0.1
-args.n_critic = 5
-args.b1 = 0.5
-args.b2 = 0.999
-
-# Data
-args.slide_deck_N = 4
-args.max_seq_length = 8
-
-args.image_H = 400
-args.image_W = 400
-
-args.train_portion = 0.7
-
-# Encoder
-args.slide_deck_embedding_size = 1024
-
-# Generator
-
-# Discriminator
-
-args.nlayers = 2
-
-args.embedding_size = 2
-
-args.ninp = 4 + args.embedding_size
-
-args.nhid = 512 #512
-
-args.dropout = 0.5
-
-args.padding_idx = 0
-
 BB_TYPES = [
     '<pad>',
     'title',
@@ -77,6 +23,67 @@ BB_TYPES = [
     'chart',
     'schematic diagram',
 ]
+
+args = edict()
+
+# General
+args.batch_size = 64
+args.n_epochs = 1000
+
+args.lr = 0.00005
+
+args.save_period = 50
+args.gpu = True
+
+# Data
+args.slide_deck_N = 4
+args.max_seq_length = 8
+args.num_label = len(BB_TYPES)
+args.padding_idx = 0
+
+args.image_H = 400
+args.image_W = 400
+
+args.train_portion = 0.7
+
+# GAN
+args.n_cpu = 4
+args.latent_vector_dim = 100
+args.channels = 1
+args.clip_value = 0.1
+args.n_critic = 5
+args.b1 = 0.5
+args.b2 = 0.999
+
+
+args.slide_deck_embedding_size = 512
+
+# LSTM
+args.lamda_l1 = 100
+args.lambda_gp = 10
+
+args.enable_L1_loss = True
+args.enable_gp = True
+args.enable_clipping = False
+
+args.nlayers = 2
+args.embedding_size = 2
+args.ninp = 4 + args.embedding_size
+args.nhid = 512 #512
+args.dropout = 0.5
+
+# Transformer
+args.enable_reconst = False
+
+args.latent_size = 4
+
+args.G_d_model=256
+args.G_nhead=4
+args.G_num_layers=8
+
+args.D_d_model=256
+args.D_nhead=4
+args.D_num_layers=8
 
 device = 'cuda:0' if torch.cuda.is_available() and args.gpu else 'cpu'
 Tensor = torch.cuda.FloatTensor if device == 'cuda:0' else torch.FloatTensor

@@ -14,7 +14,7 @@ from torch.nn.modules import loss
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
-from model import Discriminator, SlideDeckEncoder, Generator
+from model_lstm import Discriminator, SlideDeckEncoder, Generator
 from preprocess import init_dataset
 from test import test
 
@@ -123,7 +123,6 @@ def run_epochs(models, optimizers, train_dataloader, test_dataloader, checkpoint
                 save_checkpoint(models, optimizers, checkpoint_dir, epoch)
 
 def get_l1_loss(fake_layouts, real_layouts):
-    
     return F.l1_loss(fake_layouts, real_layouts)
 
 
