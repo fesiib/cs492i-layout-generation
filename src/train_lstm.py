@@ -150,9 +150,11 @@ def run_epoch(
         for model in models:
             models[model].eval()
 
+    shape = None
     real_layouts_bbs = None
     fake_layouts_bbs = None
     ref_length = None
+    ref_types = None
 
     for i, batch in enumerate(dataloader):
         batch = SortByRefSlide(batch)
@@ -160,6 +162,7 @@ def run_epoch(
         # ['shape', 'ref_slide', 'ref_types', 'slide_deck', 'lengths_slide_deck', 'length_ref_types']
 
         # conditioning
+        shape = batch["shape"].to(device)
         x_slide_deck = batch["slide_deck"].to(device)
         length_ref = batch["length_ref_types"].to(device)
         ref_types = batch["ref_types"].to(device)
@@ -256,11 +259,17 @@ def run_epoch(
         writer.add_scalar('Loss/Generator', total_loss_G/G_num, epoch)
         writer.add_scalar('Loss/Discriminator Real', total_loss_D_real/D_num, epoch)
         writer.add_scalar('Loss/Discriminator Fake', total_loss_D_fake/D_num, epoch)
-        if real_layouts_bbs is not None and fake_layouts_bbs is not None:
+        if (
+            shape is not None and
+            real_layouts_bbs is not None and 
+            fake_layouts_bbs is not None and
+            ref_length is not None and
+            ref_types is not None
+        ):
             batch_size, _, _ = real_layouts_bbs.shape
             reals = []
-            for i in range(batch_size//4):
-                img = get_img_bbs((1, 1), real_layouts_bbs[i,:ref_length[i],:])
+            for i in range(args.num_image):
+                img = get_img_bbs(shape[i], real_layouts_bbs[i,:ref_length[i],:], ref_types[i,:ref_length[i]], normalized=args.normalized)
                 img = cv2.resize(img, (args.image_H, args.image_W))
                 img = np.transpose(img, (2, 0, 1))
                 reals.append(img)
@@ -268,8 +277,8 @@ def run_epoch(
             writer.add_images('real layouts', reals, epoch)
             
             fakes = []
-            for i in range(batch_size//4):
-                img = get_img_bbs((1, 1), fake_layouts_bbs[i,:ref_length[i],:])
+            for i in range(args.num_image):
+                img = get_img_bbs(shape[i], fake_layouts_bbs[i,:ref_length[i],:], ref_types[i,:ref_length[i]], normalized=args.normalized)
                 img = cv2.resize(img, (args.image_H, args.image_W))
                 img = np.transpose(img, (2, 0, 1))
                 fakes.append(img)

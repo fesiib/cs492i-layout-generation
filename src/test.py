@@ -10,6 +10,7 @@ def test(models, optimizers, loader):
 
     batch = list(loader)[0]
     batch = SortByRefSlide(batch)
+    shape = batch['shape'].to(device)
     x_slide_deck = batch["slide_deck"].to(device)
     length_ref = batch["length_ref_types"].to(device)
     ref_types = batch["ref_types"].to(device)
@@ -29,5 +30,5 @@ def test(models, optimizers, loader):
 
     fake_layouts_bbs = models['generator'](ref_types, z, slide_deck_embedding, length_ref)[0].detach()
     real_layouts_bbs = ref_slide[:,:,:-1]
-    draw_bbs((1,1),real_layouts_bbs[4])
-    draw_bbs((1,1), fake_layouts_bbs[4])
+    draw_bbs(shape,real_layouts_bbs[4], ref_types[4])
+    draw_bbs(shape, fake_layouts_bbs[4], ref_types[4])

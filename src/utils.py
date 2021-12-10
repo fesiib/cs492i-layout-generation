@@ -1,3 +1,4 @@
+import matplotlib as mpl
 import torch
 import numpy as np
 
@@ -43,8 +44,10 @@ args.padding_idx = 0
 
 args.image_H = 400
 args.image_W = 400
+args.num_image = 4
 
 args.train_portion = 0.7
+args.normalized = True
 
 # GAN
 args.n_cpu = 4
@@ -117,41 +120,90 @@ def SortByRefSlide(batch):
     
     return batch
 
-def draw_bbs(shape, bbs):
+def draw_bbs(shape, bbs, labels, normalized=True):
     if (torch.is_tensor(bbs)):
         bbs = np.array(bbs.tolist())
     if (torch.is_tensor(shape)):
         [h, w] = np.array(shape.tolist())
         shape = (h, w)
+    if (torch.is_tensor(labels)):
+        labels = np.array(labels.tolist())
     
-    h, w = shape
+    eh, ew = shape
+    sh, sw = 0, 0
+    if normalized:
+        sh, sw = -eh, -ew
+        eh, ew = eh*2, ew*2
+
     fig, ax = plt.subplots(1)
-    background=patches.Rectangle((-w, -h), w + w, h + h, linewidth=2, edgecolor='b', facecolor='black')
+    background=patches.Rectangle((sw, sh), ew, eh, linewidth=2, edgecolor='b', facecolor='black')
     ax.add_patch(background)
-    for bb in bbs:
-        rect = patches.Rectangle((bb[0], bb[1]), bb[2], bb[3], linewidth=1, edgecolor='r', facecolor='none')
+
+    ax2 = fig.add_axes([0.92, 0.1, 0.03, 0.8])
+
+    cmap = plt.cm.get_cmap('Set3')
+    bounds = np.linspace(1, args.num_label, args.num_label)
+    norm = mpl.colors.BoundaryNorm(bounds, args.num_label)
+    color_bar = mpl.colorbar.ColorbarBase(
+        ax2,
+        cmap=cmap,
+        spacing='proportional',
+        norm=norm,
+        ticks=bounds,
+        boundaries=bounds,
+        format='%1i'
+    )
+    
+    for label, bb in zip(labels, bbs):
+        if (label < 1):
+            continue
+        rect = patches.Rectangle((bb[0], bb[1]), bb[2], bb[3], linewidth=1, edgecolor='white', facecolor=cmap(label-1))
         ax.add_patch(rect)
     ax.autoscale(True, 'both')
     plt.show()
     return
 
-def get_img_bbs(shape, bbs):
+def get_img_bbs(shape, bbs, labels, normalized=True):
     if (torch.is_tensor(bbs)):
         bbs = np.array(bbs.tolist())
     if (torch.is_tensor(shape)):
         [h, w] = np.array(shape.tolist())
         shape = (h, w)
+    if (torch.is_tensor(labels)):
+        labels = np.array(labels.tolist())
     
-    h, w = shape
+    eh, ew = shape
+    sh, sw = 0, 0
+    if normalized:
+        sh, sw = -eh, -ew
+        eh, ew = eh*2, ew*2
+
     fig, ax = plt.subplots(1)
-    background=patches.Rectangle((-w, -h), w + w, h + h, linewidth=2, edgecolor='b', facecolor='black')
+    background=patches.Rectangle((sw, sh), ew, eh, linewidth=2, edgecolor='b', facecolor='black')
     ax.add_patch(background)
-    for bb in bbs:
-        rect = patches.Rectangle((bb[0], bb[1]), bb[2], bb[3], linewidth=1, edgecolor='r', facecolor='none')
-        ax.add_patch(rect)
+
+    ax2 = fig.add_axes([0.92, 0.1, 0.03, 0.8])
+
+    cmap = plt.cm.get_cmap('Set3')
+    bounds = np.linspace(1, args.num_label, args.num_label)
+    norm = mpl.colors.BoundaryNorm(bounds, args.num_label)
+    color_bar = mpl.colorbar.ColorbarBase(
+        ax2,
+        cmap=cmap,
+        spacing='proportional',
+        norm=norm,
+        ticks=bounds,
+        boundaries=bounds,
+        format='%1i'
+    )
     
-    # end
+    for label, bb in zip(labels, bbs):
+        if (label < 1):
+            continue
+        rect = patches.Rectangle((bb[0], bb[1]), bb[2], bb[3], linewidth=1, edgecolor='white', facecolor=cmap(label-1))
+        ax.add_patch(rect)
     ax.autoscale(True, 'both')
+
     canvas = FigureCanvasAgg(fig)
     plt.close(fig)
     

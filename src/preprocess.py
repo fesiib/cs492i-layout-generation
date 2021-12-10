@@ -194,6 +194,9 @@ class ShuffleRefSlide(object):
 class ToTensorBB(object):
     """Convert ndarrays in sample to Tensors."""
 
+    def __init__(self, do_normalize=True):
+        self.do_normalize = do_normalize
+
     def normalize(self, w, h, slide, length):
         slide[:length] = (slide[:length] - torch.tensor([w/2, h/2, 0, 0, 0])) * torch.tensor([2/w, 2/h, 2/w, 2/h, 1])
         return slide
@@ -226,9 +229,10 @@ class ToTensorBB(object):
 
 
         ## Normalize:
-        ref_slide = self.normalize(w, h, ref_slide, length_ref_types)
-        for (i, length) in enumerate(lengths_slide_deck):
-            slide_deck[i] = self.normalize(w, h, slide_deck[i], length)
+        if self.do_normalize:
+            ref_slide = self.normalize(w, h, ref_slide, length_ref_types)
+            for (i, length) in enumerate(lengths_slide_deck):
+                slide_deck[i] = self.normalize(w, h, slide_deck[i], length)
         return {
             "shape": shape,
             "ref_slide": ref_slide,
@@ -265,12 +269,6 @@ def process_slide_deck_dataset(all_dataset):
         ]).T
         slide_deck_data[slide_deck_id]['slides'][slide_id].append(bb)
     for key in slide_deck_data.keys():
-        
-        # if key == 100:
-        #     for (id, value) in slide_deck_data[key]["slides"].items():
-        #         print(56, id)
-        #         draw_bbs(slide_deck_data[key]["shape"], value)
-
         values = list(slide_deck_data[key]["slides"].values())
         slide_deck_data[key]["slides"] = [np.asarray(value) for value in values]
     return slide_deck_data
@@ -283,7 +281,7 @@ def slice_dict(dictionary, l, r):
         ret_dictionary[key] = dictionary[key]
     return ret_dictionary
 
-def init_dataset():
+def init_dataset(do_normalize=True):
     print(os.path.dirname(os.getcwd()))
     csv_files_root = os.path.join('./', "data", "bbs")
 
@@ -291,6 +289,8 @@ def init_dataset():
 
     for _, _, files in os.walk(csv_files_root):
         for file in files:
+            if (dataset is not None):
+                break
             if file.endswith('.csv'):
                 print('file: ', file)
                 csv_file_path = os.path.join(csv_files_root, file)
@@ -310,7 +310,7 @@ def init_dataset():
             RescaleBB((1, 1)),
             ShuffleRefSlide(),
             LeaveN(args.slide_deck_N),
-            ToTensorBB()
+            ToTensorBB(do_normalize)
         ])
     )
 
@@ -321,7 +321,7 @@ def init_dataset():
             RescaleBB((1, 1)),
             ShuffleRefSlide(),
             LeaveN(args.slide_deck_N),
-            ToTensorBB()
+            ToTensorBB(do_normalize)
         ])
     )
 

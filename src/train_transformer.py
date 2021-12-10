@@ -167,13 +167,16 @@ def run_epoch(
         for model in models:
             models[model].eval()
 
+    shape = None
     real_layouts_bbs = None
     fake_layouts_bbs = None
+    ret_types = None
     ref_length = None
 
     for i, batch in enumerate(dataloader):
         batch = SortByRefSlide(batch)
 
+        shape = batch["shape"].to(device)
         slide_deck = batch["slide_deck"].to(device)
         lengths_slide_deck = batch["lengths_slide_deck"].to(device)
         ref_length = batch["length_ref_types"].to(device)
@@ -207,7 +210,7 @@ def run_epoch(
         optimizers['encoder'].step()
 
         deck_enc = deck_enc.detach()
-        
+
         real_layouts_bbs = bbox_real
         fake_layouts_bbs = bbox_fake
         # Update D network
@@ -226,7 +229,6 @@ def run_epoch(
         loss_D += loss_D_recl + 10 * loss_D_recb
         loss_D.backward()
         optimizers['discriminator'].step()
-        optimizers['encoder'].step()
 
         G_num += 1
         D_num += 1
@@ -259,11 +261,17 @@ def run_epoch(
         writer.add_scalar('Loss_transf/Loss_D_recl', total_loss_D_recl, epoch)
         writer.add_scalar('Loss_transf/Loss_D_recb', total_loss_D_recb, epoch)
         writer.add_scalar('Loss_transf/Loss_G', total_loss_G, epoch)
-        if real_layouts_bbs is not None and fake_layouts_bbs is not None and ref_length is not None:
+        if (
+            shape is not None and
+            real_layouts_bbs is not None and 
+            fake_layouts_bbs is not None and
+            ref_length is not None and
+            ref_types is not None
+        ):
             batch_size, _, _ = real_layouts_bbs.shape
             reals = []
-            for i in range(batch_size//4):
-                img = get_img_bbs((1, 1), real_layouts_bbs[i,:ref_length[i],:])
+            for i in range(args.num_image):
+                img = get_img_bbs(shape[i], real_layouts_bbs[i,:ref_length[i],:], ref_types[i,:ref_length[i]], normalized=args.normalized)
                 img = cv2.resize(img, (args.image_H, args.image_W))
                 img = np.transpose(img, (2, 0, 1))
                 reals.append(img)
@@ -271,8 +279,8 @@ def run_epoch(
             writer.add_images('real layouts', reals, epoch)
             
             fakes = []
-            for i in range(batch_size//4):
-                img = get_img_bbs((1, 1), fake_layouts_bbs[i,:ref_length[i],:])
+            for i in range(args.num_image):
+                img = get_img_bbs(shape[i], fake_layouts_bbs[i,:ref_length[i],:], ref_types[i,:ref_length[i]], normalized=args.normalized)
                 img = cv2.resize(img, (args.image_H, args.image_W))
                 img = np.transpose(img, (2, 0, 1))
                 fakes.append(img)
@@ -288,7 +296,7 @@ def run_epoch(
 
 def train():
     print(device)
-    (train_dataset, test_dataset) = init_dataset()
+    (train_dataset, test_dataset) = init_dataset(args.normalized)
 
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, drop_last=True)
     test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=True, drop_last=True)
@@ -331,7 +339,7 @@ def train():
         parent_dir = result_dir / f'trial_transf_{num_trial+1}'
 
     # Modify parent_dir here if you want to resume from a checkpoint, or to rename directory.
-    #parent_dir = result_dir / 'trial_transf_0'
+    parent_dir = result_dir / 'trial_transf_1'
     print(f'Logs and ckpts will be saved in : {parent_dir}')
 
     log_dir = parent_dir
