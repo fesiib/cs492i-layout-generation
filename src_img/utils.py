@@ -25,14 +25,28 @@ BB_TYPES = [
     'schematic diagram',
 ]
 
-BB_TYPES_REDUCED = [
+NEW_BB_TYPES = [
     '<pad>',
-    'header',
-    'text box',
-    'picture',
-    'instructor',
-    'figure'
+    'header', # -> title, header
+    'text box', # -> footer, text box
+    'picture', # -> pictur
+    'figure' # -> instructor, diagram, table, figure, handwriting, chart, schematic diagram
 ]
+
+bb_map = { '<pad>' : '<pad>',
+        'title' : 'header',
+        'header': 'header',
+        'text box': 'text box',
+        'footer': 'text box',
+        'picture': 'picture',
+        'instructor': 'figure',
+        'diagram': 'figure',
+        'table': 'figure',
+        'figure': 'figure',
+        'handwriting': 'figure',
+        'chart': 'figure',
+        'schematic diagram': 'figure'
+        }
 
 args = edict()
 
@@ -121,24 +135,10 @@ def get_args():
 def get_bb_types():
    return BB_TYPES
 
-def get_reduced_bb_types():
-    return BB_TYPES_REDUCED
+def get_new_bb_types():
+    return NEW_BB_TYPES
 
 def get_bb_mapping():
-    bb_map = { '<pad>' : '<pad>',
-            'title' : 'header',
-            'header': 'header',
-            'text box': 'text box',
-            'footer': 'text box',
-            'picture': 'picture',
-            'instructor': 'instructor',
-            'diagram': 'figure',
-            'table': 'figure',
-            'figure': 'figure',
-            'handwriting': 'figure',
-            'chart': 'figure',
-            'schematic diagram': 'figure',
-            }
     return bb_map
 
 

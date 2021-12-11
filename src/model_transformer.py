@@ -71,7 +71,7 @@ class SlideDecoder(nn.Module):
         # B, N, E
         # logit_cls: [M, L]    bbox_pred: [M, 4]
         logit_cls = self.fc_out_cls(x)
-        bbox_pred = torch.tanh(self.fc_out_bbox(x))
+        bbox_pred = torch.sigmoid(self.fc_out_bbox(x))
 
         return logit_cls, bbox_pred
 
@@ -171,7 +171,7 @@ class Generator(nn.Module):
         x = self.transformer(x, src_key_padding_mask=padding_mask)
 
         x = self.fc_out(x.permute(1, 0, 2))
-        x = torch.tanh(x)
+        x = torch.sigmoid(x)
         return x
 
 class Discriminator(nn.Module):

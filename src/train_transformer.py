@@ -28,6 +28,34 @@ Tensor = get_Tensor()
 result_dir = Path(root) / 'results'
 result_dir.mkdir(parents=True, exist_ok=True)
 
+def compute_gradient_penalty(
+    D,
+    bbox_real,
+    bbox_fake,
+    label,
+    deck_enc,
+    padding_mask,
+):
+    """Calculates the gradient penalty loss for WGAN GP"""
+    # Random weight term for interpolation between real and fake samples
+    alpha = Tensor(np.random.random((bbox_real.size(0), 1, 1)))
+    # Get random interpolation between real and fake samples
+    interpolates = (alpha * bbox_real + ((1 - alpha) * bbox_fake)).requires_grad_(True)
+    d_interpolates = D(interpolates, label, deck_enc, padding_mask, reconst=False).unsqueeze(-1)
+    fake = torch.autograd.Variable(Tensor(bbox_real.shape[0], 1).fill_(1.0), requires_grad=False)
+    # Get gradient w.r.t. interpolates
+    gradients = torch.autograd.grad(
+        outputs=d_interpolates,
+        inputs=interpolates,
+        grad_outputs=fake,
+        create_graph=True,
+        retain_graph=True,
+        only_inputs=True,
+    )[0]
+    gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2)
+    gradient_penalty = torch.mean(gradient_penalty)
+    return gradient_penalty
+
 def to_one_hot(y, n_dims=None):
     """ Take integer y (tensor or variable) with n dims and convert it to 1-hot representation with n+1 dims. """
     y_tensor = y.data if isinstance(y, torch.autograd.Variable) else y
@@ -201,21 +229,13 @@ def run_epoch(
         packed_bbox_real = bbox_real[~padding_mask]
 
         # Update G network
-        models['generator'].zero_grad()
-        bbox_fake = models['generator'](z, label, deck_enc, padding_mask)
-        D_fake = models['discriminator'](bbox_fake, label, deck_enc, padding_mask)
-        loss_G = F.softplus(-D_fake).mean()
-        loss_G.backward()
-        optimizers['generator'].step()
-        optimizers['encoder'].step()
-
-        deck_enc = deck_enc.detach()
-
-        real_layouts_bbs = bbox_real
-        fake_layouts_bbs = bbox_fake
+        bbox_fake = models['generator'](z, label, deck_enc, padding_mask).detach()
+        # D_fake = models['discriminator'](bbox_fake, label, deck_enc, padding_mask)
+        # loss_G = F.softplus(-D_fake).mean()
+        
         # Update D network
         models['discriminator'].zero_grad()
-        D_fake = models['discriminator'](bbox_fake.detach(), label, deck_enc, padding_mask)
+        D_fake = models['discriminator'](bbox_fake, label, deck_enc, padding_mask)
         loss_D_fake = F.softplus(D_fake).mean()
         
         D_real, logit_cls, bbox_recon = \
@@ -227,12 +247,15 @@ def run_epoch(
 
         loss_D = loss_D_real + loss_D_fake
         loss_D += loss_D_recl + 10 * loss_D_recb
+
+        loss_GP = compute_gradient_penalty(models["discriminator"], bbox_real, bbox_fake, label, deck_enc, padding_mask)
+        loss_D += loss_GP * args.lambda_gp
+
         loss_D.backward()
         optimizers['discriminator'].step()
+        optimizers['encoder'].step()
 
-        G_num += 1
         D_num += 1
-        total_loss_G += loss_G.item()
         total_loss_D += loss_D.item()
         total_loss_D_fake += loss_D_fake.item()
         total_loss_D_real += loss_D_real.item()
@@ -240,6 +263,26 @@ def run_epoch(
         total_loss_D_recl += loss_D_recl.item()
         total_D_real += torch.sigmoid(D_real).mean().item()
         total_D_fake += torch.sigmoid(D_fake).mean().item()
+
+        if (i % args.n_critic == 0):
+            models['generator'].zero_grad()
+            models['encoder'].zero_grad()
+            
+            deck_enc = models['encoder'](bboxes, labels, padding_masks)
+
+            bbox_fake = models['generator'](z, label, deck_enc, padding_mask)
+            D_fake = models['discriminator'](bbox_fake, label, deck_enc, padding_mask)
+            loss_G = F.softplus(-D_fake).mean()
+            loss_G.backward()
+            
+            optimizers['generator'].step()
+            optimizers['encoder'].step()
+
+            G_num += 1
+            total_loss_G += loss_G.item()
+
+            real_layouts_bbs = bbox_real
+            fake_layouts_bbs = bbox_fake
     
     if G_num > 0:
         total_loss_G /= G_num
@@ -268,7 +311,6 @@ def run_epoch(
             ref_length is not None and
             ref_types is not None
         ):
-            batch_size, _, _ = real_layouts_bbs.shape
             reals = []
             for i in range(args.num_image):
                 img = get_img_bbs(shape[i], real_layouts_bbs[i,:ref_length[i],:], ref_types[i,:ref_length[i]], normalized=args.normalized)
