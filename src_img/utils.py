@@ -97,6 +97,11 @@ args.D_d_model=256
 args.D_nhead=4
 args.D_num_layers=8
 
+# CNN based GAN: LayoutEncoder
+args.layout_encoder_dim = 128
+args.cond_layout_encoder_dim = 128
+args.slide_deck_embedding_output_dim = 128
+
 device = 'cuda:0' if torch.cuda.is_available() and args.gpu else 'cpu'
 Tensor = torch.cuda.FloatTensor if device == 'cuda:0' else torch.FloatTensor
 
@@ -135,6 +140,7 @@ def get_bb_mapping():
             'schematic diagram': 'figure',
             }
     return bb_map
+
 
 def SortByRefSlide(batch):
     idx = [*range(batch["ref_slide"].shape[0])]
