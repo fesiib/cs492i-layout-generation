@@ -224,8 +224,7 @@ def run_epoch(
         total_loss_D_real += loss_D_real.item()
         total_loss_D += loss_D.item()
         D_num += 1
-        with torch.backends.cudnn.flags(enabled=False):
-            loss_D.backward()
+        loss_D.backward()
         optimizers["discriminator"].step()
         optimizers["encoder"].step()
 

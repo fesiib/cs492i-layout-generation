@@ -47,14 +47,14 @@ args.image_W = 400
 args.num_image = 4
 
 args.train_portion = 0.7
-args.normalized = True
+args.normalized = False
 
 # GAN
 args.n_cpu = 4
 args.latent_vector_dim = 100
 args.channels = 1
 args.clip_value = 0.1
-args.n_critic = 5
+args.n_critic = 2
 args.b1 = 0.5
 args.b2 = 0.999
 

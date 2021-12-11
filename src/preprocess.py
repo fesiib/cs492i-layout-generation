@@ -289,8 +289,6 @@ def init_dataset(do_normalize=True):
 
     for _, _, files in os.walk(csv_files_root):
         for file in files:
-            if (dataset is not None):
-                break
             if file.endswith('.csv'):
                 print('file: ', file)
                 csv_file_path = os.path.join(csv_files_root, file)
