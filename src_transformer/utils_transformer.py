@@ -83,6 +83,7 @@ args.b2 = 0.999
 
 
 args.slide_deck_embedding_size = 512
+args.small_dim_slide = 64
 
 # LSTM
 args.lamda_l1 = 100
