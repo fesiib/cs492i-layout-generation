@@ -182,8 +182,6 @@ def run_epoch(
         optimizers["encoder"].zero_grad()
         optimizers["discriminator"].zero_grad()
 
-
-
         # Sample noise as generator input
         layout_mu, logVar = models['encoder'](ref_slide)
         batch_size, _ = ref_types.shape
@@ -193,9 +191,10 @@ def run_epoch(
         z_hat = q.rsample()
         
         generated_reconstruction = models["generator"](z_hat).detach()
-        L_rec = criterion(generated_reconstruction - real_layouts_bbs)
-        L_kl =  0.5 * torch.sum(-1 - logVar + layout_mu.pow(2) + logVar.exp())
-        L_encoder = L_kl + L_rec
+
+        l_rec_encoder = criterion(generated_reconstruction, real_layouts_bbs)
+        L_kl =  0.5 * torch.sum(-1 - logVar + layout_mu.pow(2) + logVar.exp()) / batch_size
+        L_encoder = L_kl + l_rec_encoder
         L_encoder.backward()
         optimizers["encoder"].step()
 
@@ -253,10 +252,8 @@ def run_epoch(
 
         # Train the generator every n_critic iterations
         if i % args.n_critic == 0:
-            optimizers["encoder"].zero_grad()
+            
             optimizers["generator"].zero_grad()
-            optimizers["discriminator"].zero_grad()
-
             layout_mu, logVar = models['encoder'](ref_slide)
             batch_size, _ = ref_types.shape
             # sample z from q
@@ -265,7 +262,7 @@ def run_epoch(
             z_hat = q.rsample()
             
             generated_reconstruction = models["generator"](z_hat)
-            L_rec = criterion(generated_reconstruction - ref_slide)
+            l_rec_generator = criterion(generated_reconstruction, ref_slide)
             
             d_losses = []
             # diversity loss
@@ -273,22 +270,20 @@ def run_epoch(
                 z_temp = torch.autograd.Variable(Tensor(np.random.normal(0, 1, (batch_size, args.layout_encoder_dim))))
                 l = torch.mean((models["generator"](z_temp) - ref_slide).pow(2), dim=(1, 2, 3))
                 d_losses.append(l)
-            loss_diversity = torch.mean(torch.min(torch.cat(d_losses, dim = 1), dim = 1))
+            loss_diversity = torch.mean(torch.min(torch.stack(d_losses, dim = 1), dim = 1))
 
-
-
+            z = torch.autograd.Variable(Tensor(np.random.normal(0, 1, (batch_size, args.layout_encoder_dim))))
             fake_layouts_bbs = models['generator'](z)
             
             # Adversarial loss
             loss_G = criterion(models["discriminator"](ref_types, fake_layouts_bbs), torch.ones((batch_size, 1)))
             
-            loss_G += (loss_diversity + L_rec)
+            loss_G += (loss_diversity + l_rec_generator)
             total_loss_G += loss_G.item()
             
             G_num += 1
             loss_G.backward()
             optimizers["generator"].step()
-            optimizers["encoder"].step()
     
     if writer is not None:
         if L1_loss:
