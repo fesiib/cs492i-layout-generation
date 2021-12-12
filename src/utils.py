@@ -167,7 +167,8 @@ def draw_bbs(shape, bbs, labels, normalized=True):
     fig, ax = plt.subplots(1)
     background=patches.Rectangle((sw, sh), ew, eh, linewidth=2, edgecolor='b', facecolor='black')
     ax.add_patch(background)
-
+    ax.invert_yaxis()
+    
     ax2 = fig.add_axes([0.92, 0.1, 0.03, 0.8])
 
     cmap = plt.cm.get_cmap('Set3')
@@ -210,6 +211,7 @@ def get_img_bbs(shape, bbs, labels, normalized=True):
     fig, ax = plt.subplots(1)
     background=patches.Rectangle((sw, sh), ew, eh, linewidth=2, edgecolor='b', facecolor='black')
     ax.add_patch(background)
+    ax.invert_yaxis()
 
     ax2 = fig.add_axes([0.92, 0.1, 0.03, 0.8])
 
