@@ -12,8 +12,8 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
-from model import SlideDeckEncoder
-from model_no_encoder import Generator, Discriminator 
+from model_no_encoder import Discriminator, Generator
+from model_combined import SlideDeckEncoder, CombinedDiscriminator, CombinedGenerator 
 from preprocess_root import init_dataset
 from utils_transformer import SortByRefSlide, get_device, get_args, get_img_bbs, get_Tensor
 
@@ -113,7 +113,7 @@ def run_epochs(models, optimizers, train_dataloader, test_dataloader, checkpoint
     
     #last_eval, best_iou = -1e+8, -1e+8
     for epoch in range(loaded_epoch + 1, args.n_epochs):
-        D_loss, G_loss = run_epoch_no_encoder(
+        D_loss, G_loss = run_epoch(
             epoch,
             models,
             optimizers,
@@ -337,155 +337,6 @@ def run_epoch(
 
     return total_loss_D, total_loss_G
 
-def run_epoch_no_encoder(
-    epoch, models, optimizers,
-    is_train=True, dataloader=None, writer = None,
-):
-        
-    total_loss_G = 0
-    total_loss_D = 0
-
-    G_num = 0
-    D_num = 0
-    total_loss_D_fake = 0
-    total_loss_D_real = 0
-    total_loss_D_recb = 0
-    total_loss_D_recl = 0
-    total_D_real = 0
-    total_D_fake = 0
-
-    if is_train:
-        for model in models:
-            models[model].train()
-    else:
-        for model in models:
-            models[model].eval()
-
-    shape = None
-    real_layouts_bbs = None
-    fake_layouts_bbs = None
-    ret_types = None
-    ref_length = None
-
-    for i, batch in enumerate(dataloader):
-        batch = SortByRefSlide(batch)
-
-        shape = batch["shape"].to(device)
-        slide_deck = batch["slide_deck"].to(device)
-        lengths_slide_deck = batch["lengths_slide_deck"].to(device)
-        ref_length = batch["length_ref_types"].to(device)
-        ref_types = batch["ref_types"].to(device).long()
-        ref_slide = batch["ref_slide"].to(device)
-        
-        label = ref_types
-        
-        padding_mask = ~(ref_length[:, None] > torch.arange(label.size(1)).to(device)[None, :])
-        bbox_real = ref_slide[:, :, :-1]
-        z = torch.autograd.Variable(Tensor(np.random.normal(0, 1, (label.size(0), label.size(1), args.latent_size))))
-        packed_label = to_one_hot(label[~padding_mask], args.num_label)
-        packed_bbox_real = bbox_real[~padding_mask]
-
-        # Update G network
-        bbox_fake = models['generator'](z, label, padding_mask).detach()
-        # D_fake = models['discriminator'](bbox_fake, label, deck_enc, padding_mask)
-        # loss_G = F.softplus(-D_fake).mean()
-        
-        # Update D network
-        models['discriminator'].zero_grad()
-        D_fake = models['discriminator'](bbox_fake, label, padding_mask)
-        loss_D_fake = F.softplus(D_fake).mean()
-        
-        D_real, logit_cls, bbox_recon = \
-            models['discriminator'](bbox_real, label, padding_mask, reconst=True)
-        loss_D_real = F.softplus(-D_real).mean()
-
-        loss_D_recl = F.cross_entropy(logit_cls, packed_label)
-        loss_D_recb = F.mse_loss(bbox_recon, packed_bbox_real)
-
-        loss_D = loss_D_real + loss_D_fake
-        loss_D += loss_D_recl + 10 * loss_D_recb
-
-        loss_D.backward()
-        optimizers['discriminator'].step()
-        #optimizers['encoder'].step()
-
-        D_num += 1
-        total_loss_D += loss_D.item()
-        total_loss_D_fake += loss_D_fake.item()
-        total_loss_D_real += loss_D_real.item()
-        total_loss_D_recb += loss_D_recb.item()
-        total_loss_D_recl += loss_D_recl.item()
-        total_D_real += torch.sigmoid(D_real).mean().item()
-        total_D_fake += torch.sigmoid(D_fake).mean().item()
-
-        if (i % args.n_critic == 0):
-            models['generator'].zero_grad()
-            
-            bbox_fake = models['generator'](z, label, padding_mask)
-            D_fake = models['discriminator'](bbox_fake, label, padding_mask)
-            loss_G = F.softplus(-D_fake).mean()
-            loss_G.backward()
-            
-            optimizers['generator'].step()
-
-            G_num += 1
-            total_loss_G += loss_G.item()
-
-            real_layouts_bbs = bbox_real
-            fake_layouts_bbs = bbox_fake
-    
-    if G_num > 0:
-        total_loss_G /= G_num
-    if D_num > 0:
-        total_loss_D /= D_num
-        total_loss_D_fake /= D_num
-        total_loss_D_real /= D_num
-        total_loss_D_recb /= D_num
-        total_loss_D_recl /= D_num
-        total_D_real /= D_num
-        total_D_fake /= D_num
-
-    if writer is not None:
-        writer.add_scalar('Loss_transf/D_value/real', total_D_real, epoch)
-        writer.add_scalar('Loss_transf/D_value/fake', total_D_fake, epoch)
-        writer.add_scalar('Loss_transf/Loss_D', total_loss_D, epoch)
-        writer.add_scalar('Loss_transf/Loss_D_fake', total_loss_D_fake, epoch)
-        writer.add_scalar('Loss_transf/Loss_D_real', total_loss_D_real, epoch)
-        writer.add_scalar('Loss_transf/Loss_D_recl', total_loss_D_recl, epoch)
-        writer.add_scalar('Loss_transf/Loss_D_recb', total_loss_D_recb, epoch)
-        writer.add_scalar('Loss_transf/Loss_G', total_loss_G, epoch)
-        if (
-            shape is not None and
-            real_layouts_bbs is not None and 
-            fake_layouts_bbs is not None and
-            ref_length is not None and
-            ref_types is not None
-        ):
-            reals = []
-            for i in range(args.num_image):
-                img = get_img_bbs(shape[i], real_layouts_bbs[i,:ref_length[i],:], ref_types[i,:ref_length[i]], normalized=args.normalized)
-                img = cv2.resize(img, (args.image_H, args.image_W))
-                img = np.transpose(img, (2, 0, 1))
-                reals.append(img)
-            reals = np.concatenate(np.expand_dims(reals, axis=0))
-            writer.add_images('real layouts', reals, epoch)
-            
-            fakes = []
-            for i in range(args.num_image):
-                img = get_img_bbs(shape[i], fake_layouts_bbs[i,:ref_length[i],:], ref_types[i,:ref_length[i]], normalized=args.normalized)
-                img = cv2.resize(img, (args.image_H, args.image_W))
-                img = np.transpose(img, (2, 0, 1))
-                fakes.append(img)
-            fakes = np.concatenate(np.expand_dims(fakes, axis=0))
-            writer.add_images('fake layouts', fakes, epoch)
-    print(
-        "[Epoch %d/%d] [D loss: %.4f D real loss: %.4f D fake loss: %.4f| Steps: %d] [G loss: %.4f Steps: %d]"
-        % (epoch, args.n_epochs, total_loss_D, total_loss_D_real, total_loss_D_fake, 
-        D_num, total_loss_G, G_num)
-    )
-
-    return total_loss_D, total_loss_G
-
 def train():
     print(device)
     (train_dataset, test_dataset) = init_dataset(root, args.normalized)
@@ -494,19 +345,19 @@ def train():
     test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=True, drop_last=True)
 
     encoder = SlideDeckEncoder(
-        args.num_label, args.slide_deck_embedding_size, args.slide_deck_N, args.padding_idx, 
+        args.num_label, args.slide_deck_embedding_size, args.small_dim_slide, args.slide_deck_N, args.padding_idx, 
         args.D_d_model, args.D_nhead, args.D_num_layers
     ).to(device)
 
-    generator = Generator(
-        args.latent_size, args.num_label, args.slide_deck_embedding_size, args.padding_idx,
+    generator = CombinedGenerator(
+        args.latent_size, args.num_label, args.small_dim_slide, args.padding_idx,
         d_model=args.G_d_model,
         nhead=args.G_nhead,
         num_layers=args.G_num_layers,
     ).to(device)
 
-    discriminator = Discriminator(
-        args.num_label, args.slide_deck_embedding_size, args.max_seq_length, args.padding_idx,
+    discriminator = CombinedDiscriminator(
+        args.num_label, args.slide_deck_embedding_size, args.small_dim_slide, args.max_seq_length, args.padding_idx,
         d_model=args.D_d_model,
         nhead=args.D_nhead,
         num_layers=args.D_num_layers,
@@ -523,7 +374,26 @@ def train():
         "generator": torch.optim.Adam(models["generator"].parameters(), lr=args.lr),
         "encoder" : torch.optim.Adam(models["encoder"].parameters(), lr=args.lr)
     }
+
+
+    no_encoder_path = result_dir / 'trial_transf_2' / 'checkpoint_499.pt'
+    try:
+       no_encoder_checkpoint = torch.load(no_encoder_path)
+    except:
+        print("Couldn't load the pre-trained encoding!")
+        return 0
     
+    models['discriminator'].discriminator.load_state_dict(no_encoder_checkpoint['model_discriminator_state_dict'])
+    models['generator'].generator.load_state_dict(no_encoder_checkpoint['model_generator_state_dict'])
+    models['encoder'].encoder.load_state_dict(models['discriminator'].discriminator.encoder.state_dict())
+    for param in models['generator'].generator.parameters():
+        param.requires_grad = False
+    for param in models['discriminator'].discriminator.parameters():
+        param.requires_grad = False
+    for param in models['encoder'].encoder.parameters():
+        param.requires_grad = False
+        
+
     num_trial=0
     parent_dir = result_dir / f'trial_transf_{num_trial}'
     while parent_dir.is_dir():
@@ -531,7 +401,7 @@ def train():
         parent_dir = result_dir / f'trial_transf_{num_trial+1}'
 
     # Modify parent_dir here if you want to resume from a checkpoint, or to rename directory.
-    parent_dir = result_dir / 'trial_transf_2'
+    parent_dir = result_dir / 'trial_transf_3'
     print(f'Logs and ckpts will be saved in : {parent_dir}')
 
     log_dir = parent_dir

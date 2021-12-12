@@ -26,7 +26,7 @@ class SlideDeckEncoder(nn.Module):
             output = self.encoder(bbox, label, padding_mask)
             slides.append(output)
         output = torch.stack(slides, dim=0)
-        output = torch.max(output, dim=0)
+        output = torch.max(output, dim=0).values
         deck_enc = self.fc_out(output)
         return deck_enc
 
@@ -39,6 +39,7 @@ class CombinedGenerator(nn.Module):
         self.generator = Generator(dim_latent, num_label, small_dim_slide, padding_idx, d_model, nhead, num_layers)
 
         self.fc_deck = nn.Linear(small_dim_slide, d_model)
+        self.fc_in = nn.Linear(d_model*2, d_model)
 
     def forward(self, z, label, deck_enc, padding_mask):
         # B x N x E
