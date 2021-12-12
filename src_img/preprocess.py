@@ -6,19 +6,23 @@ from functools import cmp_to_key
 
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+from pandas.core import indexing
 
 import torch
 
 from torch.utils.data import Dataset
 from torchvision import transforms
 
-from utils import get_BB_types, get_args, get_bb_types
+from utils import NEW_BB_TYPES, get_BB_types, get_args, get_bb_types, get_new_bb_types
+from utils import get_bb_mapping
 
 # Basic settings
 torch.manual_seed(470)
 torch.cuda.manual_seed(470)
 
 BB_TYPES = get_bb_types()
+NEW_BB_TYPES = get_new_bb_types()
+bb_map = get_bb_mapping()
 args = get_args()
 
 class BBSlideDeckDataset(Dataset):
@@ -242,6 +246,37 @@ class ToTensorBB(object):
             "length_ref_types": length_ref_types
         }
 
+class ReduceBBtypes(object):
+
+    def __init__(self) -> None:
+        def _get_new_type(bb_type: int):
+            bb_type = int(bb_type)
+            string_type = BB_TYPES[bb_type]
+            return NEW_BB_TYPES.index(bb_map[string_type])
+        self._vectorized_get_new_type = np.vectorize(_get_new_type)
+    
+    def __call__(self, sample):
+        h, w = sample["shape"]
+        ref_slide = sample["ref_slide"]
+        ref_types = sample["ref_types"]
+        slide_deck = sample["slide_deck"]
+        lengths_slide_deck = sample["lengths_slide_deck"]
+        length_ref_types = sample["length_ref_types"]
+        
+        ref_types = self._vectorized_get_new_type(ref_types)
+        ref_slide[:, 4] = self._vectorized_get_new_type(ref_slide[:, 4])
+        slide_deck[:, :, 4] =  self._vectorized_get_new_type(slide_deck[:, :, 4])
+
+        return {
+            "shape": (h, w),
+            "ref_slide": ref_slide,
+            "ref_types": ref_types,
+            "slide_deck": slide_deck,
+            "lengths_slide_deck": lengths_slide_deck,
+            "length_ref_types": length_ref_types
+        }
+
+
 def process_slide_deck_dataset(all_dataset):
     slide_deck_data = {}
     for entrance in all_dataset.iloc:
@@ -283,7 +318,7 @@ def slice_dict(dictionary, l, r):
 
 def init_dataset(do_normalize=True):
     print(os.path.dirname(os.getcwd()))
-    csv_files_root = os.path.join('./', "data", "bbs")
+    csv_files_root = os.path.join('.', "data", "bbs")
 
     dataset = None
 
@@ -307,10 +342,11 @@ def init_dataset(do_normalize=True):
         slide_deck_data=slice_dict(slide_deck_data, 0, division),
         slide_deck_N=args.slide_deck_N+1,
         transform=transforms.Compose([
-            RescaleBB((1, 1)),
+            RescaleBB((45, 60)),
             ShuffleRefSlide(),
             LeaveN(args.slide_deck_N),
-            ToTensorBB(do_normalize)
+            ReduceBBtypes(),
+            ToTensorBB(do_normalize),
         ])
     )
 
@@ -318,10 +354,12 @@ def init_dataset(do_normalize=True):
         slide_deck_data=slice_dict(slide_deck_data, division, len(slide_deck_data)),
         slide_deck_N=args.slide_deck_N+1,
         transform=transforms.Compose([
-            RescaleBB((1, 1)),
+            RescaleBB((45, 60)),
             ShuffleRefSlide(),
             LeaveN(args.slide_deck_N),
-            ToTensorBB(do_normalize)
+            ReduceBBtypes(),
+            ToTensorBB(do_normalize),
+
         ])
     )
 
@@ -329,3 +367,10 @@ def init_dataset(do_normalize=True):
         train_slide_deck_dataset,
         test_slide_deck_dataset,
     )
+
+if __name__  == "__main__":
+    a = init_dataset(False)
+    y = list(a[0])[0]
+    for k in y:
+        print(k, y[k].shape)
+    print(y)

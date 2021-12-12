@@ -1,4 +1,6 @@
+from typing import Sequence
 import matplotlib as mpl
+from numpy.core.fromnumeric import shape
 import torch
 import numpy as np
 
@@ -29,9 +31,17 @@ NEW_BB_TYPES = [
     '<pad>',
     'header', # -> title, header
     'text box', # -> footer, text box
-    'picture', # -> pictur
+    'picture', # -> picture
     'figure' # -> instructor, diagram, table, figure, handwriting, chart, schematic diagram
 ]
+bb_encodings = {
+
+    0 : (0, 0, 0), # background
+    1 : (0, 0, 1), # -> title, header
+    2 : (1, 0, 0),  # -> footer, text box
+    3 : (0, 1, 0), # -> picture
+    4 : (0, 1, 1) # -> instructor, diagram, table, figure, handwriting, chart, schematic diagram
+}
 
 bb_map = { '<pad>' : '<pad>',
         'title' : 'header',
@@ -54,7 +64,9 @@ args = edict()
 args.batch_size = 64
 args.n_epochs = 10000
 
-args.lr = 0.00005
+args.lr = 0.0002
+args.betas = (0.5, 0.999)
+args.eps = 1e-8
 
 args.save_period = 50
 args.gpu = True
@@ -140,6 +152,9 @@ def get_new_bb_types():
 
 def get_bb_mapping():
     return bb_map
+
+def get_bb_encodings():
+    return bb_encodings
 
 
 def SortByRefSlide(batch):
@@ -249,3 +264,86 @@ def get_img_bbs(shape, bbs, labels, normalized=True):
 
 def get_BB_types(bbs):
     return bbs[:, 4]
+
+def indices_array_generic(m,n):
+    r0 = np.arange(m) # Or r0,r1 = np.ogrid[:m,:n], out[:,:,0] = r0
+    r1 = np.arange(n)
+    out = np.empty((m,n,2),dtype=int)
+    out[:,:,0] = r0[:,None]
+    out[:,:,1] = r1
+    return out
+
+def process_batch_to_imgs(batch, deck=True, padded_size=(64,64)):
+
+    batch_size, _ = batch["shape"].shape
+
+    h, w = batch["shape"][0]
+    h, w = int(h), int(w)
+    x_slide_deck = batch["slide_deck"]
+    length_ref = batch["length_ref_types"]
+    ref_types = batch["ref_types"]
+    ref_slide = batch["ref_slide"]
+    slide_deck_lengths = batch['lengths_slide_deck']
+    _, deck_size, sequence_size, _ = x_slide_deck.shape
+    slide_img = np.zeros(batch_size, 3, h, w, dtype=np.np.float32)
+    if padded_size is not None:
+        slide_img = np.pad(slide_img, ((0, 0), (0, 0), (0, padded_size[0] - h), (0, padded_size[1] - w)))
+        mask = indices_array_generic(padded_size[0], padded_size[1])
+    else:
+        mask = indices_array_generic(h, w)
+
+    enc = get_bb_encodings()
+
+    for key, value in enc.items():
+        enc[key] = np.array(value)
+
+
+    for i in range(batch_size):
+        for bb in range(length_ref[i]):
+            _x = round(ref_slide[i, bb, 0])
+            _y = round(ref_slide[i, bb, 1])
+            _w = round(ref_slide[i, bb, 2])
+            _h = round(ref_slide[i, bb, 3])
+            encoding = enc[int(ref_slide[i, bb, 4])]
+            
+            _mask = (mask[:,:,1] >= _x) and (mask[:,:,1] <= _w +_x) and \
+                    (mask[:,:,0] >= _y) and (mask[:,:,0] <= _h +_y)
+            slide_img[i, :, _mask] = encoding
+
+            # x[0] to x[0] + width
+            # y[1] to y[1] + height 
+    slide_deck = None
+
+    if deck:
+        slide_deck = np.zeros(batch_size, deck_size, 3, h, w, dtype=np.np.float32)
+        if padded_size is not None:
+            slide_deck = np.pad(slide_deck, ((0, 0), (0, 0), (0,0) (0, padded_size[0] - h), (0, padded_size[1] - w)))
+        for i in range(batch_size):
+            for j in range(deck_size):
+                for bb in range(slide_deck_lengths[i,j]):
+                    _x = round(x_slide_deck[i, j, bb, 0])
+                    _y = round(x_slide_deck[i, j, bb, 1])
+                    _w = round(x_slide_deck[i, j, bb, 2])
+                    _h = round(x_slide_deck[i, j, bb, 3])
+                    encoding = enc[int(x_slide_deck[i, j, bb, 4])]
+                    
+                    _mask = (mask[:,:,1] >= _x) and (mask[:,:,1] <= _w +_x) and \
+                            (mask[:,:,0] >= _y) and (mask[:,:,0] <= _h +_y)
+                    slide_deck[i, j, :, _mask] = encoding
+
+
+
+    return {
+        "shape": batch["shape"],
+        "slide_deck": slide_deck,
+        "length_ref_types": batch["length_ref_types"],
+        "ref_types": batch["ref_types"],
+        "ref_slide": slide_img,
+        'lengths_slide_deck': batch['lengths_slide_deck']
+    }
+
+    
+
+
+
+    
