@@ -281,8 +281,9 @@ def slice_dict(dictionary, l, r):
         ret_dictionary[key] = dictionary[key]
     return ret_dictionary
 
-def init_dataset(do_normalize=True):
-    csv_files_root = os.path.join('./', "data", "bbs")
+def init_dataset(root, do_normalize=True):
+    csv_files_root = os.path.join(root, "data", "bbs")
+    print(csv_files_root)
     dataset = None
 
     for _, _, files in os.walk(csv_files_root):

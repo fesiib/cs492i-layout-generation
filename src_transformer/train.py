@@ -12,10 +12,10 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
-from model_transformer import SlideDeckEncoder
-from model_transformer_no_encoder import Generator, Discriminator 
-from preprocess import init_dataset
-from utils import SortByRefSlide, get_device, get_args, get_img_bbs, get_Tensor
+from model import SlideDeckEncoder
+from model_no_encoder import Generator, Discriminator 
+from preprocess_root import init_dataset
+from utils_transformer import SortByRefSlide, get_device, get_args, get_img_bbs, get_Tensor
 
 # Basic settings
 torch.manual_seed(470)
@@ -488,7 +488,7 @@ def run_epoch_no_encoder(
 
 def train():
     print(device)
-    (train_dataset, test_dataset) = init_dataset(args.normalized)
+    (train_dataset, test_dataset) = init_dataset(root, args.normalized)
 
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, drop_last=True)
     test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=True, drop_last=True)
