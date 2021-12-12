@@ -10,6 +10,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim
+import torch.distributions
 from torch.nn.modules import loss
 
 
@@ -17,11 +18,11 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
 from model_CNN import Discriminator, LayoutEncoder, Generator
-from preprocess import init_dataset
-from src_img.utils import process_batch_to_imgs
-from test import test
+from preprocess_CNN import init_dataset
+from utils_CNN import process_batch_to_imgs
+# from test import test
 
-from utils import SortByRefSlide, get_device, get_args, get_img_bbs, get_Tensor
+from utils_CNN import SortByRefSlide, get_device, get_args, get_img_bbs, get_Tensor
 
 # Basic settings
 torch.manual_seed(470)
@@ -131,7 +132,8 @@ def run_epoch(
     epoch, models, optimizers,
     is_train=True, dataloader=None, writer = None,
     clipping = False, L1_loss=False, gp=False):
-        
+    
+    criterion = nn.MSELoss()
     total_loss_G = 0
     total_loss_D = 0
     total_l1_D = 0
@@ -159,8 +161,11 @@ def run_epoch(
 
     for i, batch in enumerate(dataloader):
         batch = SortByRefSlide(batch)
-        batch = process_batch_to_imgs(batch)
+        batch = process_batch_to_imgs(batch, deck=False)
+        h, w = batch["shape"][0]
+        h, w = int(h), int(w)
 
+        
         # ['shape', 'ref_slide', 'ref_types', 'slide_deck', 'lengths_slide_deck', 'length_ref_types']
 
         # conditioning
@@ -177,25 +182,36 @@ def run_epoch(
         optimizers["encoder"].zero_grad()
         optimizers["discriminator"].zero_grad()
 
-        layout_encoding = models['encoder'](ref_slide)
-        
-        batch_size, _ = ref_types.shape
+
 
         # Sample noise as generator input
+        layout_mu, logVar = models['encoder'](ref_slide)
+        batch_size, _ = ref_types.shape
+        # sample z from q
+        std = torch.exp(logVar / 2)
+        q = torch.distributions.Normal(layout_mu, std)
+        z_hat = q.rsample()
+        
+        generated_reconstruction = models["generator"](z_hat).detach()
+        L_rec = criterion(generated_reconstruction - real_layouts_bbs)
+        L_kl =  0.5 * torch.sum(-1 - logVar + layout_mu.pow(2) + logVar.exp())
+        L_encoder = L_kl + L_rec
+        L_encoder.backward()
+        optimizers["encoder"].step()
+
+
+        optimizers["encoder"].zero_grad()
+        layout_mu, logVar = models['encoder'](ref_slide).detach()
+        batch_size, _ = ref_types.shape
+         # sample z from q
+        std = torch.exp(logVar / 2)
+        q = torch.distributions.Normal(layout_mu, std)
+        z_hat = q.rsample()
         z = torch.autograd.Variable(Tensor(np.random.normal(0, 1, (batch_size, args.layout_encoder_dim))))
-        
-        #   x (tensor): bb labels, (Batch_size, Sequence_size)
-        #     z (tensor): latent vector, (Batch_size, latent_vector_dim)
-        #     slide_deck_embedding (tensor): slide_deck_embedding vector, (Batch_size, slide_deck_embedding_dim)
-        #     length (tensor): (Batch_size,)
-        # (batch_size, seq, 4)
-        
-        # Configure input
-        # both have ref_types
-        
-        
         real_layouts_bbs = ref_slide
         fake_layouts_bbs = models['generator'](z).detach()
+
+
 
         # gradient_penalty = compute_gradient_penalty(
         #     models['discriminator'],
@@ -204,27 +220,31 @@ def run_epoch(
         #     z
         # )
 
-
-        loss_D_real = -torch.mean(models["discriminator"](real_layouts_bbs, layout_encoding))
-        loss_D_fake = torch.mean(models["discriminator"](fake_layouts_bbs, z))
+        loss_D_real = 0.5* criterion(models["discriminator"](real_layouts_bbs, z_hat), torch.ones((batch_size, 1)))
+        loss_D_fake = 0.5 * criterion(models["discriminator"](fake_layouts_bbs, z), torch.zeros((batch_size, 1)))
         loss_D = loss_D_real + loss_D_fake
-        
-        if L1_loss:
-            loss_D_l1 = args.lamda_l1 * get_l1_loss(fake_layouts_bbs, real_layouts_bbs)
-            loss_D += loss_D_l1
-            total_l1_D += loss_D_l1
-        # if gp:
-        #     loss_D_grad_penalty = args.lambda_gp * gradient_penalty
-        #     loss_D += loss_D_grad_penalty
-        #     total_gp_D += loss_D_grad_penalty
-
         total_loss_D_fake += loss_D_fake.item()
         total_loss_D_real += loss_D_real.item()
         total_loss_D += loss_D.item()
         D_num += 1
         loss_D.backward()
         optimizers["discriminator"].step()
-        optimizers["encoder"].step()
+        
+
+        
+
+        # if L1_loss:
+        #     loss_D_l1 = args.lamda_l1 * get_l1_loss(fake_layouts_bbs, real_layouts_bbs)
+        #     loss_D += loss_D_l1
+        #     total_l1_D += loss_D_l1
+        
+        # if gp:
+        #     loss_D_grad_penalty = args.lambda_gp * gradient_penalty
+        #     loss_D += loss_D_grad_penalty
+        #     total_gp_D += loss_D_grad_penalty
+
+
+        
 
         # Clip weights of discriminator
         if clipping:
@@ -235,13 +255,36 @@ def run_epoch(
         if i % args.n_critic == 0:
             optimizers["encoder"].zero_grad()
             optimizers["generator"].zero_grad()
+            optimizers["discriminator"].zero_grad()
 
-            slide_deck_embedding = models['encoder'](x_slide_deck, lengths_slide_deck)
-            layouts_bbs = models['generator'](ref_types, z, slide_deck_embedding, length_ref)[0]
+            layout_mu, logVar = models['encoder'](ref_slide)
+            batch_size, _ = ref_types.shape
+            # sample z from q
+            std = torch.exp(logVar / 2)
+            q = torch.distributions.Normal(layout_mu, std)
+            z_hat = q.rsample()
+            
+            generated_reconstruction = models["generator"](z_hat)
+            L_rec = criterion(generated_reconstruction - ref_slide)
+            
+            d_losses = []
+            # diversity loss
+            for i in range(args.gaus_K):
+                z_temp = torch.autograd.Variable(Tensor(np.random.normal(0, 1, (batch_size, args.layout_encoder_dim))))
+                l = torch.mean((models["generator"](z_temp) - ref_slide).pow(2), dim=(1, 2, 3))
+                d_losses.append(l)
+            loss_diversity = torch.mean(torch.min(torch.cat(d_losses, dim = 1), dim = 1))
+
+
+
+            fake_layouts_bbs = models['generator'](z)
             
             # Adversarial loss
-            loss_G = -torch.mean(models["discriminator"](ref_types, layouts_bbs, slide_deck_embedding, length_ref))
+            loss_G = criterion(models["discriminator"](ref_types, fake_layouts_bbs), torch.ones((batch_size, 1)))
+            
+            loss_G += (loss_diversity + L_rec)
             total_loss_G += loss_G.item()
+            
             G_num += 1
             loss_G.backward()
             optimizers["generator"].step()
@@ -291,7 +334,7 @@ def run_epoch(
 
 def train():
     print(device)
-    (train_dataset, test_dataset) = init_dataset()
+    (train_dataset, test_dataset) = init_dataset(False)
 
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, drop_last=True)
     test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=True, drop_last=True)
