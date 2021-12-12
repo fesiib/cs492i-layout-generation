@@ -83,6 +83,7 @@ args.b2 = 0.999
 
 
 args.slide_deck_embedding_size = 512
+args.small_dim_slide = 64
 
 # LSTM
 args.lamda_l1 = 100
@@ -187,7 +188,7 @@ def draw_bbs(shape, bbs, labels, normalized=True):
     for label, bb in zip(labels, bbs):
         if (label < 1):
             continue
-        rect = patches.Rectangle((bb[0], bb[1]), bb[2], bb[3], linewidth=1, edgecolor='white', facecolor=cmap(label-1))
+        rect = patches.Rectangle((bb[0], bb[1]), bb[2], bb[3], linewidth=1, edgecolor='white', facecolor=cmap(label-1, alpha=0.5))
         ax.add_patch(rect)
     ax.autoscale(True, 'both')
     plt.show()

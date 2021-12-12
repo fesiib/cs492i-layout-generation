@@ -12,7 +12,7 @@ import torch
 from torch.utils.data import Dataset
 from torchvision import transforms
 
-from utils import get_BB_types, get_args, get_bb_types
+from utils_transformer import get_BB_types, get_args, get_bb_types
 
 # Basic settings
 torch.manual_seed(470)
@@ -281,12 +281,15 @@ def slice_dict(dictionary, l, r):
         ret_dictionary[key] = dictionary[key]
     return ret_dictionary
 
-def init_dataset(do_normalize=True):
-    csv_files_root = os.path.join('./', "data", "bbs")
+def init_dataset(root, do_normalize=True):
+    csv_files_root = os.path.join(root, "data", "bbs")
+    print(csv_files_root)
     dataset = None
 
     for _, _, files in os.walk(csv_files_root):
         for file in files:
+            # if dataset is not None:
+            #     break
             if file.endswith('.csv'):
                 print('file: ', file)
                 csv_file_path = os.path.join(csv_files_root, file)
