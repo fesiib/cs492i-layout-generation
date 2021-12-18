@@ -13,8 +13,8 @@ import torch
 from torch.utils.data import Dataset
 from torchvision import transforms
 
-from utils import NEW_BB_TYPES, get_BB_types, get_args, get_bb_types, get_new_bb_types
-from utils import get_bb_mapping
+from utils_CNN import NEW_BB_TYPES, get_BB_types, get_args, get_bb_types, get_new_bb_types
+from utils_CNN import get_bb_mapping
 
 # Basic settings
 torch.manual_seed(470)

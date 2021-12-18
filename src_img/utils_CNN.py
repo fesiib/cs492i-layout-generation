@@ -127,6 +127,7 @@ args.D_num_layers=8
 args.layout_encoder_dim = 128
 args.cond_layout_encoder_dim = 128
 args.slide_deck_embedding_output_dim = 128
+args.gaus_K = 5
 
 device = 'cuda:0' if torch.cuda.is_available() and args.gpu else 'cpu'
 Tensor = torch.cuda.FloatTensor if device == 'cuda:0' else torch.FloatTensor
@@ -188,6 +189,7 @@ def draw_bbs(shape, bbs, labels, normalized=True):
     fig, ax = plt.subplots(1)
     background=patches.Rectangle((sw, sh), ew, eh, linewidth=2, edgecolor='b', facecolor='black')
     ax.add_patch(background)
+    ax.invert_yaxis()
 
     ax2 = fig.add_axes([0.92, 0.1, 0.03, 0.8])
 
@@ -279,13 +281,14 @@ def process_batch_to_imgs(batch, deck=True, padded_size=(64,64)):
 
     h, w = batch["shape"][0]
     h, w = int(h), int(w)
+    print(batch_size, h, w)
     x_slide_deck = batch["slide_deck"]
     length_ref = batch["length_ref_types"]
     ref_types = batch["ref_types"]
     ref_slide = batch["ref_slide"]
     slide_deck_lengths = batch['lengths_slide_deck']
     _, deck_size, sequence_size, _ = x_slide_deck.shape
-    slide_img = np.zeros(batch_size, 3, h, w, dtype=np.np.float32)
+    slide_img = np.zeros((batch_size, 3, h, w), dtype=np.float32)
     if padded_size is not None:
         slide_img = np.pad(slide_img, ((0, 0), (0, 0), (0, padded_size[0] - h), (0, padded_size[1] - w)))
         mask = indices_array_generic(padded_size[0], padded_size[1])
@@ -295,42 +298,62 @@ def process_batch_to_imgs(batch, deck=True, padded_size=(64,64)):
     enc = get_bb_encodings()
 
     for key, value in enc.items():
-        enc[key] = np.array(value)
+        enc[key] = np.array(value, dtype=np.float32)
 
 
     for i in range(batch_size):
         for bb in range(length_ref[i]):
-            _x = round(ref_slide[i, bb, 0])
-            _y = round(ref_slide[i, bb, 1])
-            _w = round(ref_slide[i, bb, 2])
-            _h = round(ref_slide[i, bb, 3])
-            encoding = enc[int(ref_slide[i, bb, 4])]
-            
-            _mask = (mask[:,:,1] >= _x) and (mask[:,:,1] <= _w +_x) and \
-                    (mask[:,:,0] >= _y) and (mask[:,:,0] <= _h +_y)
-            slide_img[i, :, _mask] = encoding
+            values = ref_slide[i, bb].tolist()
 
+            _x = int(values[0])
+            _y = int(values[1])
+            _w = int(values[2])
+            _h = int(values[3])
+            encoding = enc[int(values[4])]
+
+            
+            _mask = (mask[:,:,1] >= _x) &  (mask[:,:,1] < (_w +_x)) &  \
+                    (mask[:,:,0] >= _y) &  (mask[:,:,0] <= (_h + _y))
+
+            slide_img[i, :, _mask] = encoding
+        # import matplotlib.pyplot as plt
+        # import matplotlib.image as img
+        # print(slide_img[i].shape)
+        # t =slide_img[i]
+        # temp = np.transpose(t,(1,2,0))
+        # print(temp.shape)
+        # plt.imshow(temp)
+        # plt.show()
+        # print(ref_types[i])
+        # print(ref_slide[i])
+        # draw_bbs((45, 60), ref_slide[i][:,],ref_types[i], False)
             # x[0] to x[0] + width
             # y[1] to y[1] + height 
+
+    
+    slide_img = Tensor(slide_img)
+    print(slide_img.shape)
     slide_deck = None
 
     if deck:
-        slide_deck = np.zeros(batch_size, deck_size, 3, h, w, dtype=np.np.float32)
+        slide_deck = np.zeros((batch_size, deck_size, 3, h, w), dtype=np.float32)
         if padded_size is not None:
-            slide_deck = np.pad(slide_deck, ((0, 0), (0, 0), (0,0) (0, padded_size[0] - h), (0, padded_size[1] - w)))
+            slide_deck = np.pad(slide_deck, ((0, 0), (0, 0), (0,0), (0, padded_size[0] - h), (0, padded_size[1] - w)))
         for i in range(batch_size):
             for j in range(deck_size):
                 for bb in range(slide_deck_lengths[i,j]):
-                    _x = round(x_slide_deck[i, j, bb, 0])
-                    _y = round(x_slide_deck[i, j, bb, 1])
-                    _w = round(x_slide_deck[i, j, bb, 2])
-                    _h = round(x_slide_deck[i, j, bb, 3])
-                    encoding = enc[int(x_slide_deck[i, j, bb, 4])]
-                    
-                    _mask = (mask[:,:,1] >= _x) and (mask[:,:,1] <= _w +_x) and \
-                            (mask[:,:,0] >= _y) and (mask[:,:,0] <= _h +_y)
-                    slide_deck[i, j, :, _mask] = encoding
 
+                    values = x_slide_deck[i, j, bb].tolist()
+                    _x = int(values[0])
+                    _y = int(values[1])
+                    _w = int(values[2])
+                    _h = int(values[3])
+                    encoding =  enc[int(values[4])]
+                    
+                    _mask = (mask[:,:,1] >= _x) &  (mask[:,:,1] <= (_w +_x)) &  \
+                            (mask[:,:,0] >= _y) &  (mask[:,:,0] <= (_h +_y))
+                    slide_deck[i, j, :, _mask] = encoding
+        slide_deck = Tensor(slide_deck)
 
 
     return {

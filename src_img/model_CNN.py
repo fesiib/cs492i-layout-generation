@@ -6,7 +6,7 @@ from numpy.core.shape_base import stack
 from torch.autograd import backward
 from torch.nn.functional import pad
 
-from utils import get_args, get_bb_types, get_device
+from utils_CNN import get_args, get_bb_types, get_device
 
 import torch
 import torch.nn as nn
@@ -47,6 +47,7 @@ class ConvBlock(nn.Module):
 
 
     def forward(self, x):
+        print(x.shape)
         output = self.conv(x)
         
         if self.batchnorm is not None:
@@ -127,7 +128,7 @@ class ConditionedLayoutEncoder(nn.Module):
             out_c = in_c * 2
         
         self.final_conv1 =  ConvBlock(in_channels = y_dimension + 512, 
-            out_channels= 128, 
+            out_channels= args.cond_layout_encoder_dim, 
             kernel_size=4, 
             stride=1, 
             padding=0, 
@@ -135,9 +136,9 @@ class ConditionedLayoutEncoder(nn.Module):
             batch_norm=False, 
             activation=None)
         
-        self.final_conv2 =  ConvBlock(in_channels=128, 
+        self.final_conv2 =  ConvBlock(in_channels=y_dimension + 512, 
             out_channels=args.cond_layout_encoder_dim, 
-            kernel_size=1, 
+            kernel_size=4, 
             stride=1, 
             padding=0, 
             bias=True, 
@@ -158,12 +159,12 @@ class ConditionedLayoutEncoder(nn.Module):
         y = y.transpose(1, 3).transpose(0, 2)
 
         output = torch.cat((output, y), 1)
-        output = self.final_conv1(output)
-        output = self.final_conv2(output)
-        output = torch.squeeze(output, dim=3)
-        output = torch.squeeze(output, dim=2)
+        output_mu = self.final_conv1(output)
+        logVar = self.final_conv2(output)
+        output_mu = torch.squeeze(torch.squeeze(output_mu, dim=3), dim=2)
+        logVar = torch.squeeze(torch.squeeze(logVar, dim=3), dim=2)
 
-        return output
+        return output_mu, logVar
 
 class LayoutEncoder(nn.Module):
     """
@@ -200,7 +201,7 @@ class LayoutEncoder(nn.Module):
             out_c = in_c * 2
         
         self.final_conv1 =  ConvBlock(in_channels = in_c, 
-            out_channels= 128, 
+            out_channels= args.layout_encoder_dim, 
             kernel_size=4, 
             stride=1, 
             padding=0, 
@@ -208,9 +209,9 @@ class LayoutEncoder(nn.Module):
             batch_norm=False, 
             activation=None)
         
-        self.final_conv2 =  ConvBlock(in_channels=128, 
+        self.final_conv2 =  ConvBlock(in_channels=in_c, 
             out_channels=args.layout_encoder_dim, 
-            kernel_size=1, 
+            kernel_size=4, 
             stride=1, 
             padding=0, 
             bias=True, 
@@ -223,12 +224,12 @@ class LayoutEncoder(nn.Module):
         for i, layer in enumerate(self.convs):
             output = layer(output)
 
-        output = self.final_conv1(output)
+        output_mu = self.final_conv1(output)
+        logVar = self.final_conv2(output)
 
-        output = self.final_conv2(output)
-        output = torch.squeeze(output, dim=3)
-        output = torch.squeeze(output, dim=2)
-        return output
+        output_mu = torch.squeeze(torch.squeeze(output_mu, dim=3), dim=2)
+        logVar = torch.squeeze(torch.squeeze(logVar, dim=3), dim=2)
+        return output_mu, logVar
 
 
 class SlideDeckEncoder(nn.Module):
@@ -432,65 +433,6 @@ class Discriminator(nn.Module):
         
         return output
 
-
-class Discriminator(nn.Module):
-
-    def __init__(self, input_channels=3):
-        super(Discriminator, self).__init__()
-        self.convs = nn.ModuleList()
-
-        conv1 = ConvBlock(in_channels = input_channels, 
-            out_channels=64, 
-            kernel_size=5, 
-            stride=2, 
-            padding=2, 
-            bias=True, 
-            batch_norm=False, 
-            activation="LeakyReLU")
-
-        self.convs.append(conv1)
-        in_c = 64
-        out_c = in_c * 2
-        for i in range(3): 
-            conv = ConvBlock(in_channels = in_c, 
-                out_channels=out_c, 
-                kernel_size=5, 
-                stride=2, 
-                padding=2, 
-                bias=True, 
-                batch_norm=True, 
-                activation="LeakyReLU")
-            self.convs.append(conv)
-            in_c = out_c
-            out_c = in_c * 2
-        
-        self.final_conv1 =  ConvBlock(in_channels = in_c, 
-            out_channels=128, 
-            kernel_size=4, 
-            stride=1, 
-            padding=0, 
-            bias=True, 
-            batch_norm=False, 
-            activation=None)
-        
-        self.fc = nn.Linear(128 + args.layout_encoder_dim, 1)
-        self.act = nn.LeakyReLU(0.1, True)
-
-
-    def forward(self, x, z):
-
-        output = x
-        for i, layer in enumerate(self.convs):
-            output = layer(output)
-
-        output = self.final_conv1(output)
-        output = torch.squeeze(output, dim=3)
-        output = torch.squeeze(output, dim=2)
-        
-        output = torch.cat((output, z), dim=1)
-        output = self.act(self.fc(output))
-        
-        return output
 
         
 
