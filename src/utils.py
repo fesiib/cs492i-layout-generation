@@ -74,7 +74,7 @@ args.normalized = False
 
 # GAN
 args.n_cpu = 4
-args.latent_vector_dim = 100
+args.latent_vector_dim = 28
 args.channels = 1
 args.clip_value = 0.1
 args.n_critic = 2
@@ -82,7 +82,7 @@ args.b1 = 0.5
 args.b2 = 0.999
 
 
-args.slide_deck_embedding_size = 512
+args.slide_deck_embedding_size = 1024
 
 # LSTM
 args.lamda_l1 = 100
@@ -101,7 +101,7 @@ args.dropout = 0.5
 # Transformer
 args.enable_reconst = False
 
-args.latent_size = 4
+args.latent_size = 100
 
 args.G_d_model=256
 args.G_nhead=4
@@ -142,12 +142,67 @@ def SortByRefSlide(batch):
     def by_length(p1, p2):
         return batch["length_ref_types"][p2] - batch["length_ref_types"][p1]
     idx = sorted(idx, key=cmp_to_key(by_length))
-
     idx = torch.tensor(idx).to(device).long()
     for prop in batch.keys():
         batch[prop] = batch[prop][idx]
     
     return batch
+
+def draw_all_bbs(shape, list_bbs, list_labels, k=6, normalized=True):
+    
+    if (torch.is_tensor(list_bbs)):
+        list_bbs = np.array(list_bbs.tolist())
+    if (torch.is_tensor(list_labels)):
+        list_labels = np.array(list_labels.tolist())
+    if (torch.is_tensor(shape)):
+        [h, w] = np.array(shape.tolist())
+        shape = (h, w)
+
+    figh = len(list_bbs) // k
+    figw = k
+
+    fig, axs = plt.subplots(figh, figw, figsize=(5 * figw, 5 * figh))
+    cmap = plt.cm.get_cmap('Set3')
+    for i, (bbs, labels) in enumerate(zip(list_bbs, list_labels)):
+        if (torch.is_tensor(bbs)):
+            bbs = np.array(bbs.tolist())
+        if (torch.is_tensor(labels)):
+            labels = np.array(labels.tolist())
+        
+        figi = i // k
+        figj = i % k
+        ax = axs[figi, figj]
+        
+        eh, ew = shape
+        sh, sw = 0, 0
+        if normalized:
+            sh, sw = -eh, -ew
+            eh, ew = eh*2, ew*2
+
+        background=patches.Rectangle((sw, sh), ew, eh, linewidth=2, edgecolor='b', facecolor='black')
+        ax.add_patch(background)
+        ax.invert_yaxis()
+        
+        for label, bb in zip(labels, bbs):
+            if (label < 1):
+                continue
+            rect = patches.Rectangle((bb[0], bb[1]), bb[2], bb[3], linewidth=1, edgecolor='white', facecolor=cmap(label-1, alpha=0.5))
+            ax.add_patch(rect)
+        ax.autoscale(True, 'both')
+    
+    bounds = np.linspace(1, args.num_label, args.num_label)
+    norm = mpl.colors.BoundaryNorm(bounds, args.num_label)
+
+    ax2 = fig.add_axes([0.92, 0.1, 0.03, 0.8])
+    color_bar = mpl.colorbar.ColorbarBase(
+        ax2,
+        cmap=cmap,
+        spacing='proportional',
+        norm=norm,
+        ticks=bounds,
+        boundaries=bounds,
+        format='%1i'
+    )
 
 def draw_bbs(shape, bbs, labels, normalized=True):
     if (torch.is_tensor(bbs)):
