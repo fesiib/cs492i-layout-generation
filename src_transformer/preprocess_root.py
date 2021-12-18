@@ -288,9 +288,11 @@ def init_dataset(root, do_normalize=True):
 
     for _, _, files in os.walk(csv_files_root):
         for file in files:
-            # if dataset is not None:
-            #     break
+            #if dataset is not None:
+            #    break
             if file.endswith('.csv'):
+                # if file != 'slide_deck_dataset_acl17.csv':
+                #     continue
                 print('file: ', file)
                 csv_file_path = os.path.join(csv_files_root, file)
                 cur_dataset = pd.read_csv(csv_file_path)

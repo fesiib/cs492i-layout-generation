@@ -401,7 +401,7 @@ def train():
         parent_dir = result_dir / f'trial_transf_{num_trial+1}'
 
     # Modify parent_dir here if you want to resume from a checkpoint, or to rename directory.
-    parent_dir = result_dir / 'trial_transf_3'
+    parent_dir = result_dir / 'trial_transf_4'
     print(f'Logs and ckpts will be saved in : {parent_dir}')
 
     log_dir = parent_dir

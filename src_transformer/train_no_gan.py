@@ -113,7 +113,7 @@ def run_epochs(models, optimizers, train_dataloader, test_dataloader, checkpoint
     
     #last_eval, best_iou = -1e+8, -1e+8
     for epoch in range(loaded_epoch + 1, args.n_epochs):
-        D_loss, G_loss = run_epoch(
+        G_loss = run_epoch(
             epoch,
             models,
             optimizers,
@@ -178,16 +178,8 @@ def run_epoch(
 ):
         
     total_loss_G = 0
-    total_loss_D = 0
 
     G_num = 0
-    D_num = 0
-    total_loss_D_fake = 0
-    total_loss_D_real = 0
-    total_loss_D_recb = 0
-    total_loss_D_recl = 0
-    total_D_real = 0
-    total_D_fake = 0
 
     if is_train:
         for model in models:
@@ -218,92 +210,40 @@ def run_epoch(
         bboxes = slide_deck[:, :, :, :-1]
         labels = slide_deck[:, :, :, -1].long()
         padding_masks = ~(lengths_slide_deck[:, :, None] > torch.arange(labels.size(2)).to(device)[None, :])
-        models['encoder'].zero_grad()
-        deck_enc = models['encoder'](bboxes, labels, padding_masks)
 
         label = ref_types
         
         padding_mask = ~(ref_length[:, None] > torch.arange(label.size(1)).to(device)[None, :])
         bbox_real = ref_slide[:, :, :-1]
         z = torch.autograd.Variable(Tensor(np.random.normal(0, 1, (label.size(0), label.size(1), args.latent_size))))
-        packed_label = to_one_hot(label[~padding_mask], args.num_label)
-        packed_bbox_real = bbox_real[~padding_mask]
 
         # Update G network
-        bbox_fake = models['generator'](z, label, deck_enc, padding_mask).detach()
         # D_fake = models['discriminator'](bbox_fake, label, deck_enc, padding_mask)
         # loss_G = F.softplus(-D_fake).mean()
+        models['generator'].zero_grad()
+        models['encoder'].zero_grad()
         
-        # Update D network
-        models['discriminator'].zero_grad()
-        D_fake = models['discriminator'](bbox_fake, label, deck_enc, padding_mask)
-        loss_D_fake = F.softplus(D_fake).mean()
+        deck_enc = models['encoder'](bboxes, labels, padding_masks)
+
+        bbox_fake = models['generator'](z, label, deck_enc, padding_mask)
+        #loss_G = F.cross_entropy(logit_cls, packed_label)
+        loss_G = F.mse_loss(bbox_fake, bbox_real)
         
-        D_real, logit_cls, bbox_recon = \
-            models['discriminator'](bbox_real, label, deck_enc, padding_mask, reconst=True)
-        loss_D_real = F.softplus(-D_real).mean()
-
-        loss_D_recl = F.cross_entropy(logit_cls, packed_label)
-        loss_D_recb = F.mse_loss(bbox_recon, packed_bbox_real)
-
-        loss_D = loss_D_real + loss_D_fake
-        loss_D += loss_D_recl + 10 * loss_D_recb
-
-        loss_GP = compute_gradient_penalty(models["discriminator"], bbox_real, bbox_fake, label, deck_enc, padding_mask)
-        loss_D += loss_GP * args.lambda_gp
-
-        loss_D.backward()
-        optimizers['discriminator'].step()
+        loss_G.backward()
+        
+        optimizers['generator'].step()
         optimizers['encoder'].step()
 
-        D_num += 1
-        total_loss_D += loss_D.item()
-        total_loss_D_fake += loss_D_fake.item()
-        total_loss_D_real += loss_D_real.item()
-        total_loss_D_recb += loss_D_recb.item()
-        total_loss_D_recl += loss_D_recl.item()
-        total_D_real += torch.sigmoid(D_real).mean().item()
-        total_D_fake += torch.sigmoid(D_fake).mean().item()
+        G_num += 1
+        total_loss_G += loss_G.item()
 
-        if (i % args.n_critic == 0):
-            models['generator'].zero_grad()
-            models['encoder'].zero_grad()
-            
-            deck_enc = models['encoder'](bboxes, labels, padding_masks)
-
-            bbox_fake = models['generator'](z, label, deck_enc, padding_mask)
-            D_fake = models['discriminator'](bbox_fake, label, deck_enc, padding_mask)
-            loss_G = F.softplus(-D_fake).mean()
-            loss_G.backward()
-            
-            optimizers['generator'].step()
-            optimizers['encoder'].step()
-
-            G_num += 1
-            total_loss_G += loss_G.item()
-
-            real_layouts_bbs = bbox_real
-            fake_layouts_bbs = bbox_fake
+        real_layouts_bbs = bbox_real
+        fake_layouts_bbs = bbox_fake
     
     if G_num > 0:
         total_loss_G /= G_num
-    if D_num > 0:
-        total_loss_D /= D_num
-        total_loss_D_fake /= D_num
-        total_loss_D_real /= D_num
-        total_loss_D_recb /= D_num
-        total_loss_D_recl /= D_num
-        total_D_real /= D_num
-        total_D_fake /= D_num
 
     if writer is not None:
-        writer.add_scalar('Loss_transf/D_value/real', total_D_real, epoch)
-        writer.add_scalar('Loss_transf/D_value/fake', total_D_fake, epoch)
-        writer.add_scalar('Loss_transf/Loss_D', total_loss_D, epoch)
-        writer.add_scalar('Loss_transf/Loss_D_fake', total_loss_D_fake, epoch)
-        writer.add_scalar('Loss_transf/Loss_D_real', total_loss_D_real, epoch)
-        writer.add_scalar('Loss_transf/Loss_D_recl', total_loss_D_recl, epoch)
-        writer.add_scalar('Loss_transf/Loss_D_recb', total_loss_D_recb, epoch)
         writer.add_scalar('Loss_transf/Loss_G', total_loss_G, epoch)
         if (
             shape is not None and
@@ -330,12 +270,11 @@ def run_epoch(
             fakes = np.concatenate(np.expand_dims(fakes, axis=0))
             writer.add_images('fake layouts', fakes, epoch)
     print(
-        "[Epoch %d/%d] [D loss: %.4f D real loss: %.4f D fake loss: %.4f| Steps: %d] [G loss: %.4f Steps: %d]"
-        % (epoch, args.n_epochs, total_loss_D, total_loss_D_real, total_loss_D_fake, 
-        D_num, total_loss_G, G_num)
+        "[Epoch %d/%d] [G loss: %.4f Steps: %d]"
+        % (epoch, args.n_epochs, total_loss_G, G_num)
     )
 
-    return total_loss_D, total_loss_G
+    return total_loss_G
 
 def train():
     print(device)
@@ -382,7 +321,7 @@ def train():
         parent_dir = result_dir / f'trial_transf_{num_trial+1}'
 
     # Modify parent_dir here if you want to resume from a checkpoint, or to rename directory.
-    parent_dir = result_dir / 'trial_transf_2'
+    parent_dir = result_dir / 'trial_transf_5'
     print(f'Logs and ckpts will be saved in : {parent_dir}')
 
     log_dir = parent_dir
