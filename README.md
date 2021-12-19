@@ -1,5 +1,52 @@
-# intro_to_dl_project
+# Structure-aware Layout Generation
 
-Dataset: 
+### Team 9: Bekzat Tilekbay, Shyngys Aitkazinov
 
-wget --load-cookies /tmp/cookies.txt "https://docs.google.com/uc?export=download&confirm=$(wget --quiet --save-cookies /tmp/cookies.txt --keep-session-cookies --no-check-certificate 'https://docs.google.com/uc?export=download&id=1Cjc3Ae_knnMzjAIzg1sHc4jIEs1-5x7_' -O- | sed -rn 's/.*confirm=([0-9A-Za-z_]+).*/\1\n/p')&id=1Cjc3Ae_knnMzjAIzg1sHc4jIEs1-5x7_" -O doc2ppt.tar.gz && rm -rf /tmp/cookies.txt
+## Installation
+
+1. Clone this repository
+
+    ```bash
+    git clone https://github.com/fesiib/cs492i-layout-generation.git
+    cd cs492i-layout-generation
+    ```
+
+2. Create a new [conda](https://docs.conda.io/en/latest/miniconda.html) environment (Python 3.8)
+
+    ```bash
+    conda env create -f environment.yml
+    conda activate layout-generation
+    ```
+
+3. Change the directories appropriately in `train` and `test` files in each `src`
+We assume that all the pretrained models are in `results` folder. Avoid using prefix `trial_`, as it might get deleted while training
+
+## Development environment
+
+-   Ubuntu 18.04, CUDA 11.3
+
+## Test
+
+Access one of `src_*` and run `test.ipynb`
+
+## Train
+
+Let `SRC` be one of `src_lstm, src_transformer` and `TRAIN` be one of `train_*.py`
+
+```
+python SRC/train TRAIN
+```
+
+Checkpoints with metavariables will be saved in folder `./results`
+
+## Results
+
+## Models
+| Models            | Epochs|      Link     | Comments |
+| ----------------- | ----: | :-----------: | :------: |
+| LSTM-GAN          | 329   | [Drive](https://drive.google.com/file/d/1yJxYFjGnMfNz97c5OwbLm3h6-xyZiy-4/view?usp=sharing)  |
+| Transformer-GAN   | 249   | [Drive](https://drive.google.com/file/d/1L2ED0_JRfttPX7DACwNDAgotCJ-buqPh/view?usp=sharing) | Requires LayoutGAN++
+| Transformer-MSE   | 249   | [Drive](https://drive.google.com/file/d/1yMfsRCt-x127k8aUmtbuf_jCTj9y7DOW/view?usp=sharing)
+| LayoutGAN++       | 499   | [Drive](https://drive.google.com/file/d/1dZAJQXXosnLcFqMhVxB6IrDeDQVIaqZt/view?usp=sharing)
+
+## References

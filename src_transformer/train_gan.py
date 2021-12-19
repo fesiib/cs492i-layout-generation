@@ -1,7 +1,4 @@
 root = './'
-PRETRAINED_LAYOUTGAN = 'checkpoint_499.pt'
-PARENT_LAYOUTGAN = 'trial_transf_2'
-
 import os
 from pathlib import Path
 
@@ -15,7 +12,8 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
-from model_combined import SlideDeckEncoder, CombinedDiscriminator, CombinedGenerator 
+from model_gan import SlideDeckEncoder
+from model_gan import Generator, Discriminator 
 from preprocess import init_dataset
 from utils_transformer import SortByRefSlide, get_device, get_args, get_img_bbs, get_Tensor
 
@@ -347,19 +345,19 @@ def train():
     test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=True, drop_last=True)
 
     encoder = SlideDeckEncoder(
-        args.num_label, args.slide_deck_embedding_size, args.small_dim_slide, args.slide_deck_N, args.padding_idx, 
+        args.num_label, args.slide_deck_embedding_size, args.slide_deck_N, args.padding_idx, 
         args.D_d_model, args.D_nhead, args.D_num_layers
     ).to(device)
 
-    generator = CombinedGenerator(
-        args.latent_size, args.num_label, args.small_dim_slide, args.padding_idx,
+    generator = Generator(
+        args.latent_size, args.num_label, args.slide_deck_embedding_size, args.padding_idx,
         d_model=args.G_d_model,
         nhead=args.G_nhead,
         num_layers=args.G_num_layers,
     ).to(device)
 
-    discriminator = CombinedDiscriminator(
-        args.num_label, args.slide_deck_embedding_size, args.small_dim_slide, args.max_seq_length, args.padding_idx,
+    discriminator = Discriminator(
+        args.num_label, args.slide_deck_embedding_size, args.max_seq_length, args.padding_idx,
         d_model=args.D_d_model,
         nhead=args.D_nhead,
         num_layers=args.D_num_layers,
@@ -376,26 +374,7 @@ def train():
         "generator": torch.optim.Adam(models["generator"].parameters(), lr=args.lr),
         "encoder" : torch.optim.Adam(models["encoder"].parameters(), lr=args.lr)
     }
-
-
-    no_encoder_path = result_dir / PARENT_LAYOUTGAN / PRETRAINED_LAYOUTGAN 
-    try:
-       no_encoder_checkpoint = torch.load(no_encoder_path)
-    except:
-        print("Couldn't load the pre-trained encoding!")
-        return 0
     
-    models['discriminator'].discriminator.load_state_dict(no_encoder_checkpoint['model_discriminator_state_dict'])
-    models['generator'].generator.load_state_dict(no_encoder_checkpoint['model_generator_state_dict'])
-    models['encoder'].encoder.load_state_dict(models['discriminator'].discriminator.encoder.state_dict())
-    for param in models['generator'].generator.parameters():
-        param.requires_grad = False
-    for param in models['discriminator'].discriminator.parameters():
-        param.requires_grad = False
-    for param in models['encoder'].encoder.parameters():
-        param.requires_grad = False
-        
-
     num_trial=0
     parent_dir = result_dir / f'trial_transf_{num_trial}'
     while parent_dir.is_dir():
@@ -403,7 +382,7 @@ def train():
         parent_dir = result_dir / f'trial_transf_{num_trial+1}'
 
     # Modify parent_dir here if you want to resume from a checkpoint, or to rename directory.
-    parent_dir = result_dir / 'trial_transf_4'
+    # parent_dir = result_dir / 'trial_transf_2'
     print(f'Logs and ckpts will be saved in : {parent_dir}')
 
     log_dir = parent_dir
@@ -411,6 +390,8 @@ def train():
     writer = SummaryWriter(log_dir)
 
     run_epochs(models, optimizers, train_loader, test_loader, checkpoint_dir=ckpt_dir, writer = writer, load_last = True)
+
+    #test(models, optimizers, test_loader)
 
 if __name__ == "__main__":
     train()

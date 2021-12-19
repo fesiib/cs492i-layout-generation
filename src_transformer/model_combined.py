@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from model_no_encoder import SlideEncoder, SlideDecoder, TransformerWithToken, Generator, Discriminator
+from model_layoutGAN import SlideEncoder, SlideDecoder, TransformerWithToken, Generator, Discriminator
 
 class SlideDeckEncoder(nn.Module):
     def __init__(self, num_label, dim_slide, small_dim_slide, num_slide, padding_idx,
