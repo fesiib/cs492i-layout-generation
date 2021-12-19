@@ -47,9 +47,9 @@ Checkpoints with metavariables will be saved in folder `./results`
 
 ### Qualitative Results
 
-![Transformer-MSE Results](./evaluation/qualitative/tr-mse.png "Transformer-MSE Results")
-![Transformer-GAN Results](./evaluation/qualitative/tr-gan.png "Transformer-GAN Results")
-![LSTM-GAN Results](./evaluation/qualitative/lstm.png "LSTM-GAN Results")
+<img src="./evaluation/qualitative/tr-mse.png" alt="transformer-mse" title="Transformer-MSE Results" width="100" height="400">
+<img src="./evaluation/qualitative/tr-gan.png" alt="transformer-gan" title="Transformer-GAN Results" width="100" height="400">
+<img src="./evaluation/qualitative/lstm.png" alt="lstm" title="LSTM-GAN Results" width="100" height="400">
 
 ## Models
 | Models            | Epochs|      Link     | Comments |
