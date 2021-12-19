@@ -11,7 +11,7 @@
     cd cs492i-layout-generation
     ```
 
-2. Create a new [conda](https://docs.conda.io/en/latest/miniconda.html) environment (Python 3.8)
+2. Create a new [conda](https://docs.conda.io/en/latest/) environment (Python 3.8)
 
     ```bash
     conda env create -f environment.yml
