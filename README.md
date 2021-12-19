@@ -51,7 +51,7 @@ Checkpoints with metavariables will be saved in folder `./results`
 
 Dataset is located in `./data/bbs/` in `.csv` format.
 
-Was Generated from DOC2PPT[1] Dataset with FitVid layout detection (fine-tuned CenterNet[2]) model.
+Was Generated from [DOC2PPT](https://doc2ppt.github.io/)[1] Dataset with [FitVid layout detection](https://github.com/imurs34/lecture_design_detection) (fine-tuned [CenterNet](https://github.com/xingyizhou/CenterNet)[2]) model.
 
 The structure is as follows:
 
