@@ -86,7 +86,6 @@ def save_checkpoint(models, optimizers, ckpt_dir, epoch):
 
 def load_chekpoint(path, models, optimizers):
     path = os.path.join(path, 'checkpoint_last.pt')
-    print(path)
     try:
        checkpoint = torch.load(path)
     except:
@@ -122,54 +121,6 @@ def run_epochs(models, optimizers, train_dataloader, test_dataloader, checkpoint
         )
         if (epoch+1) % args.save_period == 0:
             save_checkpoint(models, optimizers, checkpoint_dir, epoch)
-
-    # validation
-    # fake_layouts = []
-    # for model in models:
-    #     models[model].eval()
-    # with torch.no_grad():
-    #     for i, batch in enumerate(test_dataloader):
-    #         batch = batch.to(device)
-    #         label, mask = to_dense_batch(data.y, data.batch)
-    #         bbox_real, _ = to_dense_batch(data.x, data.batch)
-    #         padding_mask = ~mask
-    #         z = torch.randn(label.size(0), label.size(1),
-    #                         args.latent_size, device=device)
-
-    #         bbox_fake = netG(z, label, padding_mask)
-
-    #         fid_val.collect_features(bbox_fake, label, padding_mask)
-    #         fid_val.collect_features(bbox_real, label, padding_mask,
-    #                                     real=True)
-
-    #         # collect generated layouts
-    #         for j in range(label.size(0)):
-    #             _mask = mask[j]
-    #             b = bbox_fake[j][_mask].cpu().numpy()
-    #             l = label[j][_mask].cpu().numpy()
-    #             fake_layouts.append((b, l))
-
-    # fid_score_val = fid_val.compute_score()
-    # max_iou_val = compute_maximum_iou(val_layouts, fake_layouts)
-
-    # writer.add_scalar('Epoch', epoch, iteration)
-    # tag_scalar_dict = {'train': fid_score_train, 'val': fid_score_val}
-    # writer.add_scalars('Score/Layout FID', tag_scalar_dict, iteration)
-    # writer.add_scalar('Score/Maximum IoU', max_iou_val, iteration)
-
-    # # do checkpointing
-    # is_best = best_iou < max_iou_val
-    # best_iou = max(max_iou_val, best_iou)
-
-    # save_checkpoint({
-    #     'args': vars(args),
-    #     'epoch': epoch + 1,
-    #     'netG': netG.state_dict(),
-    #     'netD': netD.state_dict(),
-    #     'best_iou': best_iou,
-    #     'optimizerG': optimizerG.state_dict(),
-    #     'optimizerD': optimizerD.state_dict(),
-    # }, is_best, out_dir)
 
 def run_epoch(
     epoch, models, optimizers,
@@ -276,7 +227,6 @@ def run_epoch(
     return total_loss_G
 
 def train():
-    print(device)
     (train_dataset, test_dataset) = init_dataset(root, args.normalized)
 
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, drop_last=True)
@@ -328,8 +278,6 @@ def train():
     writer = SummaryWriter(log_dir)
 
     run_epochs(models, optimizers, train_loader, test_loader, checkpoint_dir=ckpt_dir, writer = writer, load_last = True)
-
-    #test(models, optimizers, test_loader)
 
 if __name__ == "__main__":
     train()
