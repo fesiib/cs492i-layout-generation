@@ -291,8 +291,7 @@ def run_epoch(
     return total_loss_D/D_num, total_loss_G/G_num
 
 def train():
-    print(device)
-    (train_dataset, test_dataset) = init_dataset()
+    (train_dataset, test_dataset) = init_dataset(root)
 
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, drop_last=True)
     test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=True, drop_last=True)
