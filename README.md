@@ -39,11 +39,25 @@ python SRC/train TRAIN
 
 Checkpoints with metavariables will be saved in folder `./results`
 
+## Models
+| Models            | Epochs|      Link     | Comments |
+| ----------------- | ----: | :-----------: | :------: |
+| LSTM-GAN          | 329   | [Drive](https://drive.google.com/file/d/1yJxYFjGnMfNz97c5OwbLm3h6-xyZiy-4/view?usp=sharing)  |
+| Transformer-GAN   | 249   | [Drive](https://drive.google.com/file/d/1L2ED0_JRfttPX7DACwNDAgotCJ-buqPh/view?usp=sharing) | Requires LayoutGAN++
+| Transformer-MSE   | 249   | [Drive](https://drive.google.com/file/d/1yMfsRCt-x127k8aUmtbuf_jCTj9y7DOW/view?usp=sharing)
+| LayoutGAN++       | 499   | [Drive](https://drive.google.com/file/d/1dZAJQXXosnLcFqMhVxB6IrDeDQVIaqZt/view?usp=sharing)
+
 ## Results
 
-### Comparisons
+### Quantitative Results
 
+| Models            |  mIOU   | Accuracy (MSE) |  Overlap   |
+| ----------------- |  ----:  | :-----------:  |  :------:  |
+| LSTM-GAN          | 0.0304  | 0.0352         |  0.3579
+| Transformer-GAN   | 0.0098  | 0.2422         |  1.4003
+| Transformer-MSE   | 0.0798  | 0.0151         |  1.0448
 
+Overlap in the actual dataset: `0.1700`.
 
 ### Qualitative Results
 
@@ -53,12 +67,5 @@ Checkpoints with metavariables will be saved in folder `./results`
     <img src="./evaluation/qualitative/lstm.png" alt="lstm" title="LSTM-GAN Results" width="200">
 </div>
 
-## Models
-| Models            | Epochs|      Link     | Comments |
-| ----------------- | ----: | :-----------: | :------: |
-| LSTM-GAN          | 329   | [Drive](https://drive.google.com/file/d/1yJxYFjGnMfNz97c5OwbLm3h6-xyZiy-4/view?usp=sharing)  |
-| Transformer-GAN   | 249   | [Drive](https://drive.google.com/file/d/1L2ED0_JRfttPX7DACwNDAgotCJ-buqPh/view?usp=sharing) | Requires LayoutGAN++
-| Transformer-MSE   | 249   | [Drive](https://drive.google.com/file/d/1yMfsRCt-x127k8aUmtbuf_jCTj9y7DOW/view?usp=sharing)
-| LayoutGAN++       | 499   | [Drive](https://drive.google.com/file/d/1dZAJQXXosnLcFqMhVxB6IrDeDQVIaqZt/view?usp=sharing)
 
 ## References
