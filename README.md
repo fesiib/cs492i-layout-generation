@@ -45,7 +45,10 @@ Checkpoints with metavariables will be saved in folder `./results`
 | LSTM-GAN          | 329   | [Drive](https://drive.google.com/file/d/1yJxYFjGnMfNz97c5OwbLm3h6-xyZiy-4/view?usp=sharing)  |
 | Transformer-GAN   | 249   | [Drive](https://drive.google.com/file/d/1L2ED0_JRfttPX7DACwNDAgotCJ-buqPh/view?usp=sharing) | Requires LayoutGAN++
 | Transformer-MSE   | 249   | [Drive](https://drive.google.com/file/d/1yMfsRCt-x127k8aUmtbuf_jCTj9y7DOW/view?usp=sharing)
-| LayoutGAN++       | 499   | [Drive](https://drive.google.com/file/d/1dZAJQXXosnLcFqMhVxB6IrDeDQVIaqZt/view?usp=sharing)
+| [LayoutGAN++](https://github.com/ktrk115/const_layout)       | 499   | [Drive](https://drive.google.com/file/d/1dZAJQXXosnLcFqMhVxB6IrDeDQVIaqZt/view?usp=sharing)
+
+
+Transformer-GAN is adapted LayouGAN++[3] and uses pretrained frozen LayoutGAN++ that we provide above. 
 
 ## Dataset
 
@@ -82,7 +85,10 @@ Overlap in the actual dataset: `0.1700`.
 
 ## References
 
-[1] DOC2PPT: Automatic Presentation Slides Generation from Scientific Documents Tsu-Jui Fu, William Yang Wang, Daniel McDuff, Yale Song, 2021
+[1] DOC2PPT: Automatic Presentation Slides Generation from Scientific Documents, Tsu-Jui Fu, William Yang Wang, Daniel McDuff, Yale Song, 2021
 
 [2] CenterNet: Keypoint Triplets for Object Detection, Kaiwen Duan, Song Bai, Lingxi Xie, Honggang Qi, Qingming Huang, Qi Tian, 2019
+
+[3] Constrained Graphic Layout Generation via Latent Optimization, Kotaro Kikuchi, Edgar Simo-Serra, Mayu Otani, Kota Yamaguchi, 2021
+
 
