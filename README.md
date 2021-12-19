@@ -47,6 +47,18 @@ Checkpoints with metavariables will be saved in folder `./results`
 | Transformer-MSE   | 249   | [Drive](https://drive.google.com/file/d/1yMfsRCt-x127k8aUmtbuf_jCTj9y7DOW/view?usp=sharing)
 | LayoutGAN++       | 499   | [Drive](https://drive.google.com/file/d/1dZAJQXXosnLcFqMhVxB6IrDeDQVIaqZt/view?usp=sharing)
 
+## Dataset
+
+Dataset is located in `./data/bbs/` in `.csv` format.
+
+Was Generated from DOC2PPT[1] Dataset with FitVid layout detection (fine-tuned CenterNet[2]) model.
+
+The structure is as follows:
+
+```
+Slide Deck Id,Slide Id,Image Height,Image Width,Type,X,Y,BB Width,BB Height
+```
+
 ## Results
 
 ### Quantitative Results
@@ -69,3 +81,8 @@ Overlap in the actual dataset: `0.1700`.
 
 
 ## References
+
+[1] DOC2PPT: Automatic Presentation Slides Generation from Scientific Documents Tsu-Jui Fu, William Yang Wang, Daniel McDuff, Yale Song, 2021
+
+[2] CenterNet: Keypoint Triplets for Object Detection, Kaiwen Duan, Song Bai, Lingxi Xie, Honggang Qi, Qingming Huang, Qi Tian, 2019
+
